@@ -1,6 +1,7 @@
 
 const { Context } = require('telegraf');
 
+const { bot } = require("@config/config");
 const { startText } = require("@models/text.model");
 const User = require("@models/user.model");
 

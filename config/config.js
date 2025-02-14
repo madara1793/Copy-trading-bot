@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
 const MONGO_URI = process.env.MONGO_URI || "";
 
+
 //Initalize DB
 mongoose
   .connect(MONGO_URI)
