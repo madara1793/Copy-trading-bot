@@ -10,6 +10,15 @@
       ],
       "@models/*": [
         "models/*"
+      ],
+      "@actions/*": [
+        "actions/*"
+      ],
+      "@utils/*": [
+        "utils/*"
+      ],
+      "@store/*": [
+        "store/*"
       ]
     }
   },
@@ -17,6 +26,9 @@
     "config/**/*",
     "commands/**/*",
     "models/**/*",
+    "actions/**/*",
+    "utils/**/*",
+    "store/**/*",
     "index.js"
   ]
 }

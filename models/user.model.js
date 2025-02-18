@@ -9,25 +9,47 @@ const UserSchema = new Schema({
     type: String,
     required: true,
   },
-  wallet: {
-    publicKey: {
-      type: String,
-      required: true,
-    },
-    privateKey: {
-      type: String,
-      required: true,
-    },
-    amount: {
-      type: Number,
-      default: 0,
-    }
+  wallets: [{
+    type: Schema.Types.ObjectId,
+    ref: "Wallet",
+  }],
+  defaultWallet: {
+    type: Schema.Types.ObjectId,
+    ref: "Wallet",
+  },
+  followingTraders: {
+    type: [String],
+    default: [],
+  },
+  intervalId: {
+    type: Number,
+    default: -1,
+  },
+  targetMinAmount: {
+    type: Number,
+    default: 0,
+  },
+  targetMaxAmount: {
+    type: Number,
+    default: 0,
+  },
+  priorityFee: {
+    type: Number,
+    default: 0.00000001,
   },
   jitoFee: {
     type: Number,
-    default: 0.1,
+    default: 0.001,
   },
-  botStatus: {
+  tradeAmount: {
+    type: Number,
+    default: 0.001,
+  },
+  slippage: {
+    type: Number,
+    default: 0.01,
+  },
+  enableAutoTrade: {
     type: Boolean,
     default: false,
   },
@@ -75,6 +97,6 @@ const UserSchema = new Schema({
   }],
 });
 
-const User = model("User", UserSchema, "Userh");
+const User = model("User", UserSchema, "User");
 
 module.exports = User;

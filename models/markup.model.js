@@ -10,7 +10,18 @@ const startMarkUp = (parseMode) => {
     return {
       parse_mode: parseMode,
       reply_markup: Markup.inlineKeyboard([
-        [Markup.button.callback('Setting', 'Setting'), Markup.button.callback('Help', 'Help')],
+        [
+          Markup.button.callback(`💳 Wallet`, 'Wallet'),
+          Markup.button.callback("📈 Copy Trade", "Copy Trade"),
+        ],
+        [
+          Markup.button.callback('➕ Add Top Trader Wallet', 'Add Top Trader'),
+          Markup.button.callback('🪪 My Following Wallets', 'Following Traders'),
+        ],
+        [
+          Markup.button.callback('🛠️ Setting', 'Setting'), 
+          Markup.button.callback('❓Help', 'Help')
+        ],
       ]).reply_markup,
     };
   } catch (error) {
@@ -24,21 +35,25 @@ const startMarkUp = (parseMode) => {
  * @param {*} user
  * @returns
  */
-const settingMarkUp = (user, amount) => {
+const settingMarkUp = (user) => {
   try {
     return Markup.inlineKeyboard([
-      [Markup.button.callback(`💳 Wallet (${amount / 1e9})`, 'Wallet')],
       [
-        Markup.button.callback(`${user.botStatus ? 'Bot On 🟢' : 'Bot Off 🔴'}`, 'On Off'),
-        Markup.button.callback(`${user.timeStatus ? 'UTC Time Check On 🟢' : 'UTC Time Check Off 🔴'}`, 'Time On Off'),
+        Markup.button.callback(`${user.enableAutoTrade?'🟢':'🔴'} Auto Trading (Auto Buy/Sell)`, "Auto Trading"),
+        Markup.button.callback(`${user.enableAutoTrade?'🔴':'🟢'} Manual Trading`, 'Manual Trading'),
+      ],
+
+      [
+        Markup.button.callback(`💵 Target Trade Min Amount`, 'TargetMinTradeAmount'),
+        Markup.button.callback(`💵 Target Trade Max Amount`, 'TargetMaxTradeAmount'),
       ],
       [
-        Markup.button.callback(`💵 Snipe Amount: ${user.snipeAmount} SOL`, 'Snipe Amount'),
-        Markup.button.callback(`💵 Fee: ${user.jitoFee}`, 'Jito Fee'),
+        Markup.button.callback(`💵 Priority Fee`, 'Priority Fee'),
+        Markup.button.callback(`💵 Jito Tip`, 'Jito Tip'),
       ],
       [
-        Markup.button.callback('⏰ Start At: 0:00', 'Start Time'),
-        Markup.button.callback('⏰ Stop At: 24:00', 'Stop Time'),
+        Markup.button.callback(`💵 Trade Amount`, 'Trade Amount'),
+        Markup.button.callback(`💵 Slippage BPS`, 'Slippage BPS'),
       ],
       [Markup.button.callback('⬅ Return', 'Return'), Markup.button.callback('❌ Close', 'Close')],
     ]);
@@ -49,6 +64,14 @@ const settingMarkUp = (user, amount) => {
 };
 
 /**
+ * The Markup of Trade Page
+ */
+const tradeMarkUp = Markup.inlineKeyboard([
+  [Markup.button.callback('Start Trade', 'Start Trade'), Markup.button.callback('Stop Trade', 'Stop Trade')],
+  [Markup.button.callback('⬅ Return', 'Return'), Markup.button.callback('❌ Close', 'Close')],
+]);
+
+/**
  * 'Close' Markup
  */
 const closeMarkUp = Markup.inlineKeyboard([[Markup.button.callback('❌ Close', 'Close')]]);
@@ -57,17 +80,64 @@ const closeMarkUp = Markup.inlineKeyboard([[Markup.button.callback('❌ Close', 
  * The Markup of Wallet page
  */
 const walletMarkUp = Markup.inlineKeyboard([
-  [Markup.button.callback('⬅ Return', 'Setting'), Markup.button.callback('❌ Close', 'Close')],
+  [
+    Markup.button.callback('📍Change Default', 'Change Default'),
+    Markup.button.callback('✏️ Set Wallet Name', 'Change Name'),
+  ],
+  [
+    Markup.button.callback('🧷 Import Wallet', 'Import Wallet Msg'), 
+    Markup.button.callback('💳 Generate Wallet', 'Generate Wallet'),
+  ],
+  [
+    Markup.button.callback('💣 Unbind Wallet', 'Unbind Wallet'),
+    Markup.button.callback('🔑 Export Wallet', 'Export Wallet'),
+  ],
+  [
+    Markup.button.callback('⬅ Return', 'Return'), 
+    Markup.button.callback('❌ Close', 'Close'),
+  ],
 ]);
+
+const defaultWalletMarkup = (wallets, type) => {
+  let buttonQuery = '';
+  switch (type) {
+    case 'default':
+      buttonQuery = 'change_wallet_';
+      break;
+    case 'name':
+      buttonQuery = 'change_name_';
+      break;
+    case 'unbind':
+      buttonQuery = 'unbind_wallet_';
+    case 'export':
+      buttonQuery = 'export_wallet_';
+    default:
+      break;
+  }
+  
+  const buttons = wallets.map((wallet, index) =>
+    Markup.button.callback(index, `${buttonQuery}${index}`)
+  );
+
+  // Group buttons into rows of 4
+  const groupedButtons = [];
+  for (let i = 0; i < buttons.length; i += 4) {
+    groupedButtons.push(buttons.slice(i, i + 4));
+  }
+
+  return Markup.inlineKeyboard(groupedButtons);
+}
 
 const helpMarkup = Markup.inlineKeyboard([
   [Markup.button.callback('⬅ Return', 'Return'), Markup.button.callback('❌ Close', 'Close')],
 ]);
 
 module.exports = {
+  tradeMarkUp,
   closeMarkUp, 
   helpMarkup, 
   walletMarkUp, 
+  defaultWalletMarkup,
   settingMarkUp, 
   startMarkUp 
 };

@@ -6,8 +6,15 @@ const mongoose = require("mongoose");
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
 const MONGO_URI = process.env.MONGO_URI || "";
 
+const HTTP_URL = process.env.HTTP_URL || '';
+const WSS_URL = process.env.WSS_URL || '';
 
-//Initalize DB
+const connection = new Connection(HTTP_URL, {
+  wsEndpoint: WSS_URL,
+});
+
+/*************************  Connect DB  *************************/
+
 mongoose
   .connect(MONGO_URI)
   .then(() => {
@@ -18,7 +25,11 @@ mongoose
   });
   
 
-// Create a new Telegraf instance
+
+
+
+/*************************  Bot Setup  *************************/
+
 const bot = new Telegraf(BOT_TOKEN);
 
 bot.use(session());
@@ -27,11 +38,14 @@ bot.use((ctx, next) => {
     if (!ctx.session) {
       ctx.session = {};
     }
+
+    return next();
   } catch (error) {
     console.error("Error:", error);
   }
 })
 
 module.exports = {
+  connection,
   bot,
 }

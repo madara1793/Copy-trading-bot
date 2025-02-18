@@ -2,7 +2,8 @@
 const { Context } = require('telegraf');
 
 const { bot } = require("@config/config");
-const { startText } = require("@models/text.model");
+const { startMarkUp, settingMarkUp } =  require("@models/markup.model");
+const { helpText, startText, settingText } = require("@models/text.model");
 const User = require("@models/user.model");
 
 /**
@@ -16,15 +17,18 @@ const startCommand = async (ctx) => {
 
     const user = await User.findOne({ tgId });
     if (!user) {
+      console.log("here")
       const newUser = new User({
         tgId,
         username,
       });
 
       await newUser.save();
-    }
 
-    await ctx.reply(startText(user), startMarkUp('HTML'));
+      await ctx.reply(startText(newUser), startMarkUp('HTML'));
+    } else {
+      await ctx.reply(startText(user), startMarkUp('HTML'));
+    }
   } catch (error) {
     console.error('Error while starting the bot:', error);
     await ctx.reply('An error occured while starting. Please try again later.');
@@ -56,8 +60,8 @@ const settingCommand = async (ctx) => {
     if (!user) {
       throw new Error('User not found!');
     }
-    const balance = await getBalanceOfWallet(user.wallet.publicKey);
-    await ctx.reply(settingText, settingMarkUp(user, balance));
+
+    await ctx.reply(settingText, settingMarkUp(user));
   } catch (error) {
     console.error('Error while settingCommand:', error);
     await ctx.reply('An error occurred while fetching your settings. Please try again later.');

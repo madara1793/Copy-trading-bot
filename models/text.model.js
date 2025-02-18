@@ -1,12 +1,44 @@
+const User = require('@models/user.model');
+const Wallet = require('@models/wallet.model');
+
+const startText = (user) => {
+  return `
+    🎉 Welcome <b>@${user.username}</b>! 
+ 
+🚀 Next-Gen Copy Trading Bot 💰
+
+Maximize profits effortlessly with our AI-powered Copy Trading Bot! 📈 Automatically mirror top traders' strategies, execute high-speed trades, and optimize every move with real-time market insights. Designed for precision, speed, and reliability, our bot ensures you stay ahead in the game—whether you're a beginner or a pro.
+
+✅ Smart Trade Execution ⚡
+✅ Real-Time Strategy Sync 🔄
+✅ Risk Management Controls 🛡️
+✅ Supports Multiple Exchanges 🌎
+
+Trade smarter, not harder. Start copying success today! 🚀🔥
+  `
+};
+
 /**
  * The text when start command is inputed
  */
-const startText = (user) => {
-  return `🎉 @${user?.username}, <b>Welcome to EdgeStrike AI-driven Scalping Trading Bot</b>
+const settingText =  `
+  🛠️ Copy Trading Bot Settings
 
-The Unique Solana Trading Bot.
+Welcome to the settings page for your Solana Trading Bot!
+
+1. Trade Amount: 
+  - Specify the amount of SOL you wish to trade (Default is 0.001 sol).
+2. Priority Fee: 
+  - Set the priority fee (in SOL) to ensure your transactions are processed quickly.
+3. Jito Fee:
+  - Set the Jito fee (in SOL) to  prioritize transaction inclusion in blocks using Jito’s MEV.
+4. Slippage BPS: 
+  - Define the slippage in basis points (bps).
+
+🔧 Please adjust these settings according to your trading strategy and preferences.
+
+                                                            The Unique Solana Trading Bot.
 `;
-};
 
 /**
  * The text to be sent when new user login
@@ -26,12 +58,73 @@ const newUserText = (user) => {
   }
 };
 
+const walletText = (wallets) => {
+  if (!wallets || wallets.length === 0) {
+    return `
+      \n <b>No wallets found</b>  Please generate new wallets
+    `;
+  }
+
+  return wallets.map((wallet, index) => {
+    return `<b>W${index + 1}</b>: ${wallet.name} ${wallet.isDefaultWallet ? '📌':''} \n<code>${wallet.publicKey}</code>`;
+  }).join('\n\n');
+};
+
+/**
+ * @param {Wallet} wallet
+ */
+const newWalletText = (wallet) => {
+  return `
+    ✅ Wallet generated successfully\nWallet address:\n<code>${wallet.publicKey}</code>\nWallet private key:\n<code>${wallet.privateKey}</code>\n
+🚨🚨Please save Private key properly, this message will be automatically deleted after 20 seconds
+❗️After the wallet is unbound, the private key cannot be retrieved
+❗️If you forget to save, please check the private key in /settings/export private key
+  `;
+};
+
+const privateKeyInputText = `
+  Please enter your private key. \n Support formats are in the style of Phantom  (e.g. "2gn5wDdGAxaJWeN...") or Solflare (e.g. [46,26,185,95,...])
+⚠️ Do not disclose your private key to others.
+`;
+
+const exportWalletKeyText = (wallet) => {
+  return `${wallet.name}\nPublic Key:\n<code>${wallet.publicKey}</code>\n\nPrivate Key:\n<code>${wallet.privateKey}</code>`;
+};
+
+
+const tradeStartText = (status) => {
+  return `
+    🤖 Copy Trade
+
+    🌐 Utilize blazing fast copy trading speeds
+
+    ${status ? '🟢 Bot is running' : '🔴 Bot is not running'}
+
+    💡 Create a task below
+  `;
+}
+
+/**
+ * The text to be sent when new user login
+ * @param {User} user
+ */
+const followingTraderText = (user) => {
+  if (!user.followingTraders || user.followingTraders.length === 0) {
+    return `
+      \n <b>No following traders found</b>  Please add following traders
+    `;
+  }
+  return user.followingTraders.map((trader, index) => {
+    return `<b>Trader ${index + 1}:</b>\n${trader}\n`;
+  }).join('\n');
+}
+
 /**
  * The text when help command is inputed
  */
-const helpText = `🚀 <b>EdgeStrike AI-driven Scalping Trading Bot</b> 🚀
+const helpText = `🚀 <b>Solana Copy Trading Bot</b> 🚀
 
-Supercharge your trading with our cutting-edge bot that tracks and capitalizes on Serum migrations from Pump.fun! 💎
+Supercharge your trading with our cutting-edge bot that tracks and capitalizes on Serum migrations from Raydium 💎
 
 Key Features: 
 ✅ Lightning-fast transaction tracking 
@@ -57,8 +150,17 @@ You bought ${tokenAmount / 10 ** tokenInfo.decimals} <b>${
 📝<a href='https://solscan.io/tx/${signature}'>Transaction</a>`;
 };
 
-const settingText = `User Setting:
-Please depoit SOL to your wallet to start sniping
-You can set auto sniping amount, jito fee, time range, etc.`;
 
-module.exports = { helpText, settingText, newUserText, startText, swapSuccessText };
+module.exports = { 
+  helpText, 
+  settingText, 
+  newUserText, 
+  walletText,
+  newWalletText,
+  privateKeyInputText,
+  exportWalletKeyText,
+  tradeStartText, 
+  followingTraderText,
+  startText, 
+  swapSuccessText 
+};
