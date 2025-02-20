@@ -92,15 +92,15 @@ const exportWalletKeyText = (wallet) => {
 };
 
 
-const tradeStartText = (status) => {
+const tradeStartText = (trades) => {
   return `
-    🤖 Copy Trade
+🤖 Copy Trade
 
-    🌐 Utilize blazing fast copy trading speeds
+🌐 Utilize blazing fast copy trading speeds
 
-    ${status ? '🟢 Bot is running' : '🔴 Bot is not running'}
+${trades.map(trade => `${trade.status ? '🟢':'🔴'} <code>${trade.targetAddress}</code>`)}
 
-    💡 Create a task below
+Create a task below
   `;
 }
 

@@ -1,5 +1,6 @@
 
 const { Context } = require('telegraf');
+const { v4: uuidv4 } = require('uuid');
 
 const { bot } = require("@config/config");
 const { startMarkUp, settingMarkUp } =  require("@models/markup.model");
@@ -17,10 +18,11 @@ const startCommand = async (ctx) => {
 
     const user = await User.findOne({ tgId });
     if (!user) {
-      console.log("here")
+      const uuid = uuidv4().split('-')[0].toUpperCase();
       const newUser = new User({
         tgId,
         username,
+        referralCode: uuid,
       });
 
       await newUser.save();

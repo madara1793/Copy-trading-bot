@@ -19,6 +19,10 @@ const startMarkUp = (parseMode) => {
           Markup.button.callback('🪪 My Following Wallets', 'Following Traders'),
         ],
         [
+          Markup.button.callback('💰 Withdraw', 'Withdraw'),
+          Markup.button.callback('👥 Referrals', 'Invite friends')
+        ],
+        [
           Markup.button.callback('🛠️ Setting', 'Setting'), 
           Markup.button.callback('❓Help', 'Help')
         ],
@@ -109,8 +113,10 @@ const defaultWalletMarkup = (wallets, type) => {
       break;
     case 'unbind':
       buttonQuery = 'unbind_wallet_';
+      break;
     case 'export':
       buttonQuery = 'export_wallet_';
+      break;
     default:
       break;
   }

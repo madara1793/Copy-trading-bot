@@ -95,6 +95,14 @@ const UserSchema = new Schema({
       default: "Bought",
     },
   }],
+  referralCode: {
+    type: String,
+    required: true,
+    unique: true,  
+  },
+  withdrawalAddress: {
+    type: String,
+  }
 });
 
 const User = model("User", UserSchema, "User");

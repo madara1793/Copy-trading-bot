@@ -96,14 +96,10 @@ let buyTokenList = [];
  * Primary function invoked by main loop and calling all subsequent functions during its work
  * @param {Context} ctx
  */
-const trackTargetWallet = async (user) => {
-
+const trackTargetWallet = async (trade) => {
     let signatures;
 
-    const wallet = await Wallet.findById(user.defaultWallet);
-    const pubKey = wallet.publicKey;
-    const secretKey = wallet.privateKey;
-    const targetWalletAddress = user.followingTraders[0];
+    const targetWalletAddress = trade.targetAddress;
   
     console.log(">>>>>Targetting >>>>>>>", targetWalletAddress);
     if (!targetWalletAddress) {
@@ -124,7 +120,7 @@ const trackTargetWallet = async (user) => {
       // Send for processing only unprocessed transactions
       // Do not send transactions created before app launch
       if (signatureInfo.blockTime && signatureInfo.blockTime > appStartedAtSeconds && !processedTransactionSignatures.includes(signatureInfo.signature)) {
-        await processTransaction(targetWallet, pubKey, secretKey, signatureInfo, user.tgId);
+        await processTransaction(signatureInfo, trade);
         processedTransactionSignatures.push(signatureInfo.signature);
         if (processedTransactionSignatures.length > processedTransactionSignaturesLimitCount)
           processedTransactionSignatures.shift(); // Remove first value to keep this list relatively short
@@ -134,16 +130,10 @@ const trackTargetWallet = async (user) => {
 
 /**
  * Process specific transaction
-  * @param {PublicKey} targetWalletAddress 
-  * @param {string} pubKey
-  * @param {string} wallet
-  * @param {any} signatureInfo
-  * @param {number} tradeAmount
-  * @param {number} jitoFee
-  * @param {string} tgId
+ *  @param {any} signatureInfo
+  * @param {any} trade
  */
-async function processTransaction(targetWalletAddress, pubKey, wallet, signatureInfo, tgId) {
-    console.info('wallet', wallet);
+async function processTransaction(signatureInfo, trade) {
     console.log('Transaction detected:');
     console.log('Signature:', signatureInfo.signature);
     console.info('Timestamp:', signatureInfo.blockTime && new Date(signatureInfo.blockTime * 1000).toLocaleString() || 'None');    
@@ -187,16 +177,15 @@ async function processTransaction(targetWalletAddress, pubKey, wallet, signature
       return;
     }
 
+    
     if (tokenData.significantMints.length > 0) {
-      console.log(tokenData.significantMints);
-      const user = await User.findOne({ tgId });
-      const tradeAmount = user.tradeAmount;
-      const jitoFee = user.jitoFee;
+      
+      const user = await User.findById(trade.userId._id);
+      const tradeAmount = trade.tradeAmount;
+      const jitoFee = trade.userId.jitoFee;
+      const pubKey = trade.wallet.publickKey;
+      const secKey = trade.wallet.privateKey;
 
-
-      if (!user) {
-        return;
-      }
       
       tokenData.significantMints.forEach(async (mint) => {
         let replyMsg = '';
@@ -209,7 +198,7 @@ async function processTransaction(targetWalletAddress, pubKey, wallet, signature
               'So11111111111111111111111111111111111111112', 
               mint.mint, 
               tradeAmount * 1e9, 
-              wallet, 
+              secKey, 
               jitoFee
             );
             if (result.success) {
@@ -222,7 +211,7 @@ async function processTransaction(targetWalletAddress, pubKey, wallet, signature
                 symbol: tokenInfo.symbol,
                 decimals: tokenInfo.decimals,
                 address: tokenInfo.address,
-                amount: tokenAmount || result.outAmount,
+                amount: result.outAmount,
                 usedSolAmount: result.solDiff,
                 price: tokenInfo.price,
               });
@@ -239,7 +228,7 @@ async function processTransaction(targetWalletAddress, pubKey, wallet, signature
               mint.mint, 
               'So11111111111111111111111111111111111111112', 
               amount, 
-              wallet, 
+              secKey, 
               jitoFee
             );
             if (result.success) {
@@ -258,200 +247,7 @@ async function processTransaction(targetWalletAddress, pubKey, wallet, signature
         await bot.telegram.sendMessage(tgId, replyMsg, { parse_mode: 'HTML' });
       })
     }
-
-
-    // if (res && res.mint && res.pool) {
-
-    //     console.info('\x1b[32mSwap transaction\x1b[0m');
-    //     console.info('Mint:', res.mint.toString());
-    //     console.info('Pool:', res.pool.toString());
-
-    //     const tradeSize = await getTradeSize(connection1, res.signature);
-
-    //     // Skip trades below the minimum threshold
-    //     // if (tradeSize < targetMinTradeAmount) {
-    //     //     logToFile('Skipped', targetWalletAddress.toString(), res.mint.toString(), (tradeSize / 1_000_000_000).toString(), 'Below minimum trade size');
-    //     //     console.log(`Skipped: Value (${tradeSize / 1000000000} SOL) below threshold (${targetMinTradeAmount / 1000000000} SOL).`);
-    //     //     return;
-    //     // }
-
-    //     logToFile('Buy Detected', targetWalletAddress.toString(), res.mint.toString(), (tradeSize / 1_000_000_000).toString());
-    //     console.log(`Target: buy ${res.mint} token on ${res.pool} pool`);
-
-
-    //     console.log(res.mint.toBase58(), wallet, tradeAmount, jitoFee)
-    //     const balance = await getBalanceOfWallet(pubKey);
-    //     let replyMessage = '';
-
-    //     if (tradeSize === 0) return;
-
-    //     if (balance < tradeAmount * 10 ** 9) {
-    //       replyMessage = `Insufficient balance. Current balance: ${balance / 1000000000} SOL`;
-    //     } else {
-    //       const tokenInfo = await getTokenInfo(res.mint.toBase58());
-
-    //       const inputToken = tradeSize === 1 ? 'So11111111111111111111111111111111111111112' : res.mint.toBase58();
-    //       const outputToken = tradeSize === 1 ? res.mint.toBase58() : 'So11111111111111111111111111111111111111112';
-    //       const amount = tradeSize === 1 ? tradeAmount * 1e9 : (await getTokenBalanceOfWallet(pubKey, res.mint.toBase58())) * (10 ** tokenInfo.decimals);
-
-    //       const result = await swapTokens(
-    //         inputToken, 
-    //         outputToken, 
-    //         amount, 
-    //         wallet, 
-    //         jitoFee
-    //       );
-
-    //       if (result.success) {
-    //         const tokenAmount = await getTokenBalanceOfWallet(pubKey, res.mint.toBase58());
-
-    //         replyMessage = swapSuccessText(tokenInfo, result.signature, tradeAmount, tokenAmount || result.outAmount);
-
-    //         const user = await User.findOne({ tgId });
-    //         if (user) {
-    //           user.tokens.push({
-    //             name: tokenInfo.name,
-    //             symbol: tokenInfo.symbol,
-    //             decimals: tokenInfo.decimals,
-    //             address: tokenInfo.address,
-    //             amount: tokenAmount || result.outAmount,
-    //             usedSolAmount: result.solDiff,
-    //             price: tokenInfo.price,
-    //           });
-    //           await user.save();
-    //         } else {
-    //           replyMessage = `🔴 Buy failed. \n ${result.error ? result.error : 'Something went wrong.'}`;
-    //         }
-    //       }
-    //     }
-
-
-    //     await bot.telegram.sendMessage(tgId, replyMessage, { parse_mode: 'HTML' });
-
-    //     // if (buy && buy.mint && buy.poolKeys) {
-    //     //     sellWithLimitOrder(connection2, buy.mint, buy.poolKeys);
-    //     // }
-    // } else {
-    //     console.info('Not a swap transaction.');
-    // }
 }
-
-/**
- * Obtains trade size for transaction with specified signature
- */
-
-async function getTradeSize(connection, signature) {
-
-    let transactionDetails;
-    try {
-        transactionDetails = await connection.getParsedTransaction(signature, {commitment: "confirmed", maxSupportedTransactionVersion: 0});
-    } catch (error) {
-        console.error('Error fetching trade size:', error);
-        return 0;
-    }
-
-    const postBalances = transactionDetails?.meta?.postBalances || [];
-    const preBalances = transactionDetails?.meta?.preBalances || [];
-    const postTokenBalances = transactionDetails?.meta?.preTokenBalances || [];
-    const preTokenBalances = transactionDetails?.meta?.preTokenBalances || [];
-
-    console.log(postBalances[0], preBalances[0], postTokenBalances[0], preTokenBalances[0]);
-
-    if (postBalances.length > 0 && preBalances.length > 0 && postTokenBalances > 0 && preTokenBalances > 0) {
-      if (postBalances[0] < preBalances[0] && postTokenBalances[0] > preTokenBalances[0]) {
-        return 1;
-      } else if (postBalances[0] > preBalances[0] && postTokenBalances[0] < preTokenBalances[0]) {
-        return -1;
-      } else {
-        return 0;
-      }
-    }
-
-    return 0;  
-}
-
-/**
- * Analyzes transaction
- * @param {Connection} connection 
- * @param signature 
- * @returns 
- */
-async function analyzeSignature(connection, signature) {
-
-    let transactionDetails;
-    try {
-        transactionDetails = await connection.getParsedTransaction(signature, {commitment: "confirmed", maxSupportedTransactionVersion: 0});
-    } catch (error) {
-        console.log('Error: analyze signature error!');
-        return null;
-    }
-
-    const signer = transactionDetails.transaction.message.accountKeys
-      .find(key => key.signer && key.writable && key.source === 'transaction')
-      ?.pubkey.toBase58();
-    if (!signer) {
-      console.log('No signer');
-      return;
-    }
-
-    const solAmount = (transactionDetails.meta.postBalances[0] - transactionDetails.meta.preBalances[0]) / LAMPORTS_IN_SOL;
-
-    const tokenData = getDeltaAmount(
-      signer, 
-      transactionDetails.meta.preTokenBalances,
-      transactionDetails.meta.postTokenBalances,
-    );
-    if (!tokenData) return;
-    if (
-      (tokenData.is_buy && solAmount > 0) ||
-      (!tokenData.is_buy && solAmount < 0)
-    ) {
-      return;
-    }
-
-    if (tokenData.significantMints.length > 0) {
-      console.log(tokenData.significantMints);
-    }
-    
-
-    // // let isBuy = true;
-    // let mintAddress;
-    // let poolAddress;
-    
-    // if (transactionDetails?.meta?.logMessages) {
-    //   const logs = transactionDetails.meta.logMessages;          
-    //   const isRaydiumLog = logs.some(log =>
-    //     log.includes(RAYDIUM_LIQUIDITYPOOL_V4.toString())
-    //   );          
-    //   const isTransferLog = logs.some(log =>
-    //     log.includes("Program log: Instruction: Transfer")
-    //   );
-  
-    //   if (isRaydiumLog && isTransferLog) {    
-    //     //console.log('--- Detect Target Wallet Swap Transaction ---');  
-    //     for (const instruction of transactionDetails.transaction.message.instructions) {  
-    //       if ('accounts' in instruction && instruction.programId.equals(RAYDIUM_LIQUIDITYPOOL_V4)) {
-    //         poolAddress = instruction.accounts[1];
-    //         const poolAccount = await connection.getAccountInfo(poolAddress, "confirmed");
-            
-    //         if(poolAccount) {
-    //           const poolInfo = LIQUIDITY_STATE_LAYOUT_V4.decode(poolAccount.data);
-    //           mintAddress = poolInfo.quoteMint.equals(SOL_ADDRESS) ? poolInfo.baseMint : poolInfo.quoteMint;
-    //         }
-    //       }
-    //       const parsedInstruction = instruction;
-    //       console.log(parsedInstruction);
-    //       if(parsedInstruction?.parsed?.type == 'createAccountWithSeed' && parsedInstruction?.parsed?.info?.lamports == '2039280') {
-    //         // isBuy = false;  
-    //       }        
-    //     }
-    //   }
-    // }  
-
-
-    // return {signature, pool: poolAddress, mint: mintAddress }  
-}
-
 
 
 const getDeltaAmount = (signer, preData, postData) => {
@@ -546,114 +342,8 @@ const getDeltaAmount = (signer, preData, postData) => {
 //   }
 // }
 
-async function getLiquidityV4PoolKeys(connection, pool) {
-  try {
-    const poolAccount = await connection.getAccountInfo(pool, "confirmed");
-    if (!poolAccount) return null;
-    const poolInfo = LIQUIDITY_STATE_LAYOUT_V4.decode(poolAccount.data);
-    if ( poolInfo.baseMint.toString() != SOL_ADDRESS.toString() && poolInfo.quoteMint.toString() != SOL_ADDRESS.toString() ) {
-      return null;
-    }
 
-    const marketAccount = await connection.getAccountInfo(
-      poolInfo.marketId,
-      "confirmed"
-    );
-    if (!marketAccount) return null;
-    const marketInfo = MARKET_STATE_LAYOUT_V3.decode(marketAccount.data);
-
-    const lpMintAccount = await connection.getAccountInfo(
-      poolInfo.lpMint,
-      "confirmed"
-    );
-    if (!lpMintAccount) return null;
-    const lpMintInfo = SPL_MINT_LAYOUT.decode(lpMintAccount.data);
-
-    const poolKeys = {
-      id: pool,
-      baseMint: poolInfo.baseMint,
-      quoteMint: poolInfo.quoteMint,
-      lpMint: poolInfo.lpMint,
-      baseDecimals: poolInfo.baseDecimal,
-      quoteDecimals: poolInfo.quoteDecimal,
-      lpDecimals: lpMintInfo.decimals,
-      version: 4,
-      programId: poolAccount.owner,
-      authority: Liquidity.getAssociatedAuthority({
-        programId: poolAccount.owner,
-      }).publicKey,
-      openOrders: poolInfo.openOrders,
-      targetOrders: poolInfo.targetOrders,
-      baseVault: poolInfo.baseVault,
-      quoteVault: poolInfo.quoteVault,
-      withdrawQueue: poolInfo.withdrawQueue,
-      lpVault: poolInfo.lpVault,
-      marketVersion: 3,
-      marketProgramId: poolInfo.marketProgramId,
-      marketId: poolInfo.marketId,
-      marketAuthority: Market.getAssociatedAuthority({
-        programId: poolInfo.marketProgramId,
-        marketId: poolInfo.marketId,
-      }).publicKey,
-      marketBaseVault: marketInfo.baseVault,
-      marketQuoteVault: marketInfo.quoteVault,
-      marketBids: marketInfo.bids,
-      marketAsks: marketInfo.asks,
-      marketEventQueue: marketInfo.eventQueue,
-      lookupTableAccount: PublicKey.default,
-    };
-    return poolKeys;
-  } catch (error) {
-    console.log('Error: get poolkeys error!');
-    return null;
-  }  
-}
-
-async function getSwapTokenGivenInInstructions (
-  owner,
-  poolKeys,
-  tokenIn,
-  _amountIn
-) {
-  const tokenOut = tokenIn.equals(poolKeys.baseMint) ? poolKeys.quoteMint : poolKeys.baseMint;
-  const tokenInATA = getAssociatedTokenAddressSync(tokenIn, owner);
-  const tokenOutATA = getAssociatedTokenAddressSync(tokenOut, owner);
-  const { innerTransaction } = Liquidity.makeSwapFixedInInstruction(
-    {
-      poolKeys: poolKeys,
-      userKeys: {
-        tokenAccountIn: tokenInATA,
-        tokenAccountOut: tokenOutATA,
-        owner,
-      },
-      amountIn: _amountIn,
-      minAmountOut: BigInt(0),
-    },
-    poolKeys.version
-  );
-  return [
-    createAssociatedTokenAccountIdempotentInstruction(
-      owner,
-      tokenOutATA,
-      owner,
-      tokenOut
-    ),
-    ...innerTransaction.instructions,
-  ];
-};
-
-// Performs logging to file
-function logToFile(action, wallet, token, amount, reason = '') { 
-  const timestamp = new Date().toISOString(); 
-  const logEntry =  `${timestamp},${action},${wallet},${token},${amount},${reason}\n`; 
-  fs.appendFileSync(LOG_FILE, logEntry); 
-} 
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 module.exports = {
   trackTargetWallet,
-  sleep
 }
