@@ -36,9 +36,21 @@ const {
   exportKey,
 } = require("@actions/wallet.action");
 const { closeAction, returnAction } = require("@actions/common.action");
-const { tradeAction, startTradeAction, terminateTradeAction } = require("@actions/trade.action");
+const { 
+  tradeAction,
+  setTradeTarget,
+  setTradeName,
+  setupTradeAction,
+  startTradeAction, 
+  terminateTradeAction,
+} = require("@actions/trade.action");
+const tradeActions = require("@actions/trade.action");
+const referralActions = require("@actions/referral.action");
+const withdrawActions = require("@actions/withdraw.action");
+const positionActions = require("@actions/position.action");
 const User = require("@models/user.model");
 const Wallet = require("@models/wallet.model");
+const Trade = require("@models/trade.model");
 const { setTargetWallet } = require("@store/index");
       
 const { trackTargetWallet } = require("@utils/trade");
@@ -49,6 +61,10 @@ bot.command("start", startCommand);
 bot.command("help", helpCommand);
 
 bot.command("setting", settingCommand);
+
+bot.command("wallets", walletAction);
+
+bot.command("positions", positionActions.positionActions);
 
 
 bot.on("text", async (ctx) => {
@@ -64,6 +80,8 @@ bot.on("text", async (ctx) => {
   try {
     const tgId = ctx.chat.id;
     const user = await User.findOne({ tgId });
+    const tradeId = ctx.session.tradeId;
+    
     if (!user) {
       throw new Error('User not found');
     }
@@ -95,6 +113,7 @@ bot.on("text", async (ctx) => {
       await importWallet(ctx);
     }
 
+    
     switch (botState) {
       case 'priorityFee': 
         await setPriorityFee(ctx);
@@ -108,6 +127,152 @@ bot.on("text", async (ctx) => {
       case 'slippage':
         await setSlippage(ctx);
         break;
+      case 'enterTargetAddress': {
+        const tradeId = ctx.session.tradeId;
+        const res = await setTradeTarget(tradeId, text);
+
+        ctx.session.state = 'enterTradeName';
+        await ctx.deleteMessage(ctx.message.message_id);
+        await ctx.deleteMessage(ctx.session.targetAddressMsgId);
+        await ctx.reply(`Please choose a name for this config:`);
+        break;
+      }
+      case 'enterTradeName': {
+        const tradeId = ctx.session.tradeId;
+        const res = await setTradeName(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        }
+        break;
+      }
+      case 'enterMinTokenHolder': {
+        const res = await tradeActions.setMinTokenHolder(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterMinTokenVolume': {
+        const res = await tradeActions.setMinVolume(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterMinMCap': {
+        const res = await tradeActions.setMinMCap(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterMaxMCap': {
+        const res = await tradeActions.setMaxMCap(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterMinTokenAge': {
+        const res = await tradeActions.setMinTokenAge(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterMaxTokenAge': {
+        const res = await tradeActions.setMaxTokenAge(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterMinTriggerAmount': {
+        const res = await tradeActions.setMinTriggerAmount(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterMaxTriggerAmount': {
+        const res = await tradeActions.setMaxTriggerAmount(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterTradeAmount': {
+        const res = await tradeActions.setTradeAmount(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterTradeSlippage': {
+        const res = await tradeActions.setCopySlippage(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterTradeJitoFee': {
+        const res = await tradeActions.setCopyJitoTip(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'enterTradePriorityFee': {
+        const res = await tradeActions.setCopyPriorityFee(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid value. Please enter a valid number.');
+        }
+        break;
+      }
+      case 'SetWithdrawal': {
+        await withdrawActions.setWithdrawalAddress(ctx);
+        break;
+      }
+      case 'WithdrawXAmount': {
+        await withdrawActions.withdrawXAmountAction(ctx);
+        break;
+      }
+      case 'CreatePosition': {
+        await positionActions.createPositionAction(ctx);
+        break;
+      }
+      case 'SetPositionBuyTip': {
+        await positionActions.setPositionBuyTip(ctx);
+        break;
+      }
+      case 'SetPositionSlippage': {
+        await positionActions.setPositionSlippage(ctx);
+        break;
+      }
       default:
         break;
     }
@@ -159,7 +324,34 @@ bot.action('Trade Amount', tradeAmountMsgAction);
 
 bot.action('Slippage BPS', slippageMsgAction);
 
-/** Trade Actions */
+
+/***************** Trade Actions ******************/
+
+bot.action('Add New Trade Config', tradeActions.addTradeMsgAction);
+bot.action('Pause Copy Trade', tradeActions.tradeAction)
+bot.action('Start Copy Trade', tradeActions.tradeAction)
+
+
+/******* Trade Settings Actions *******/
+
+bot.action('Set Min Token Holder', tradeActions.minTokenHolderMsgAction);
+bot.action('Set Min Volume', tradeActions.minTokenVolumeMsgAction);
+bot.action('Set Min MCap', tradeActions.minMCapMsgAction)
+bot.action('Set Max MCap', tradeActions.maxMCapMsgAction);
+bot.action('Set Min Token Age', tradeActions.minTokenAgeMsgAction)
+bot.action('Set Max Token Age', tradeActions.maxTokenAgeMsgAction);
+bot.action('Set Min Trigger Amount', tradeActions.minTriggerAmountMsgAction);
+bot.action('Set Max Trigger Amount', tradeActions.maxTriggerAmountMsgAction);
+bot.action('Set Copy Slippage', tradeActions.tradeSlippageMsgAction);
+bot.action('Set Copy Trade Amount', tradeActions.tradeAmountMsgAction);
+bot.action('Set Copy Jito Tip', tradeActions.tradeJitoFeeMsgAction);
+bot.action('Set Copy Priority Fee', tradeActions.tradePriorityFeeMsgAction);
+bot.action('Set Trade Status', tradeActions.updateTradeState);
+bot.action('Delete Trade Config', tradeActions.deleteTrade);
+bot.action('Return to Trade List', tradeActions.returnToTradeAction);
+
+bot.action(/trade_[A-Za-z0-9]+$/, tradeActions.openTradeAction);
+
 
 bot.action('Copy Trade', tradeAction);
 
@@ -174,6 +366,34 @@ bot.action('Following Traders', getFollowingTraders);
 bot.action('Generate Wallet', generateWalletAction);
 
 
+
+
+/******************************* Referrals  ****************************/
+
+bot.action('Invite friends', referralActions.referralAction);
+bot.action('Refresh Referrals', referralActions.referralAction);
+
+
+/******************************* Withdrawals  ****************************/
+
+bot.action('Withdraw', withdrawActions.withdrawAction);
+bot.action('Withdraw 50%', withdrawActions.withdraw50Action);
+bot.action('Withdraw 100%', withdrawActions.withdrawAllAction);
+bot.action('Withdraw X SOL', withdrawActions.withdrawXMsgAction);
+bot.action('Set Withdrawal Address', withdrawActions.setWithdrawalMsgAction);
+
+
+/******************************* Positions ****************************/
+bot.action('Position', positionActions.positionActions);
+bot.action('Import Position', positionActions.createPositionMsgAction);
+bot.action('Switch to Sell', positionActions.switchToSellPositionAction);
+bot.action('Switch to Buy', positionActions.switchToBuyPositionAction);
+bot.action(/Buy_(\d+)/, positionActions.buyPosition);
+bot.action(/Position_[A-Za-z0-9]+$/, positionActions.getPositionAction);
+bot.action(/Sell_(\d+)_[A-Za-z0-9]+$/, positionActions.sellPosition);
+// bot.action('Set Position Buy Tip', positionActions.setPositionBuyTipMsgAction);
+// bot.action('Set Position Slippage', positionActions.setPositionSlippageMsgAction);
+
 setCommands(bot);
 
 
@@ -181,13 +401,15 @@ bot.launch();
 console.log("Bot is running....");
 
 setTimeout(async() => {
-  const users = await User.find();
-  Promise.all(users.map(async (user) => {
-    if (user.enableAutoTrade) {
-      const intervalID = setInterval(() => trackTargetWallet(user), 5000);
-      user.intervalId = intervalID;
-      await user.save();
-      }
+  const trades = await Trade.find({ status: true })
+    .populate('wallet')
+    .populate('userId');
+
+  
+  Promise.all(trades.map(async (trade) => {
+    const intervalID = setTimeout(() => trackTargetWallet(trade), 5000);
+    trade.intervalId = intervalID;
+    await trade.save();
   }))
 }, 5000);
 

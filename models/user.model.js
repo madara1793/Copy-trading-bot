@@ -95,6 +95,58 @@ const UserSchema = new Schema({
       default: "Bought",
     },
   }],
+  referralCode: {
+    type: String,
+    required: true,
+    unique: true,  
+  },
+  referrer: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+  },
+  referralRewards: {
+    type: Number,
+    default: 0,
+  },
+  referLvls: {
+    level_1: {
+      count: {
+        type: Number,
+        default: 0,
+      },
+      amount: {
+        type: Number,
+        default: 0,
+      }
+    },
+    level_2: {
+      count: {
+        type: Number,
+        default: 0,
+      },
+      amount: {
+        type: Number,
+        default: 0,
+      }
+    },
+    level_3: {
+      count: {
+        type: Number,
+        default: 0,
+      },
+      amount: {
+        type: Number,
+        default: 0,
+      }
+    },
+  },
+  referralCounts: {
+    type: Number,
+    default: 0,
+  },
+  withdrawalAddress: {
+    type: String,
+  }
 });
 
 const User = model("User", UserSchema, "User");

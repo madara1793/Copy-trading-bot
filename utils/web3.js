@@ -6,6 +6,8 @@ const { connection } = require('@config/config');
 const { uint8ArrayToHex } = require("@utils/functions");
 const { getTokenPrice, getQuoteForSwap, getSerializedTransaction } = require('./jupiter');
 const { sendBundle } = require('./jito');
+const { SystemProgram } = require('@solana/web3.js');
+const { TransactionMessage } = require('@solana/web3.js');
 
 
 /**
@@ -32,6 +34,11 @@ async function getTokenInfo(mintAddress) {
     console.error('Error fetching token metadata:', error);
   }
 }
+
+const getTokenSupply = async (mint) => {
+  const res = await connection.getTokenSupply(new PublicKey(mint));
+  return res.value;
+};
 
 /**
  * Generate new Solana wallet.
@@ -151,14 +158,11 @@ const swapTokens = async (inputAddr, outputAddr, amount, secretKey, jitoFee) => 
   if (quote.error) {
     return { success: false, error: quote.error };
   }
-  console.log("-----> Quote: ", quote);
 
   const swapTransaction = await getSerializedTransaction(quote, keyPair.publicKey.toString());
   const transaction = await getDeserialize(swapTransaction);
-  console.log("-----> Swap Tx: ", transaction);
 
   const signedTransaction = await signTransaction(transaction, keyPair);
-  console.log("-----> Signed Tx: ", signedTransaction);
 
   const result = await sendBundle([signedTransaction], keyPair, jitoFee);
   console.log('sendBundle result:', result);
@@ -173,13 +177,54 @@ const swapTokens = async (inputAddr, outputAddr, amount, secretKey, jitoFee) => 
   }
 }
 
+const transferLamport = async (fromSecretKey, toPubliKey, lamports) => {
+  const payer = Keypair.fromSecretKey(bs58.default.decode(fromSecretKey));
+  const payerBalance = await connection.getBalance(payer.publicKey);
+
+  if (payerBalance < lamports) {
+    throw new Error('Insufficient SOL balance');
+  }
+
+  const instructions = [
+    SystemProgram.transfer({
+      fromPubkey: payer.publicKey,
+      toPubkey: new PublicKey(toPubliKey),
+      lamports,
+    }),
+  ];
+  const blockhash = await connection.getLatestBlockhash().then(((res) => res.blockhash));
+  const messageV0 = new TransactionMessage({
+    payerKey: payer.publicKey,
+    recentBlockhash: blockhash,
+    instructions,
+  }).compileToV0Message();
+
+  const transaction = new VersionedTransaction(messageV0);
+
+  transaction.sign([payer]);
+  const txId = await connection.sendTransaction(transaction);
+
+  return txId;
+}
+
+const confirmTransaction = async (txid) => {
+  const res = await connection.confirmTransaction(txid);
+  if (res.value.err) {
+    throw new Error(res.value.err.toString());
+  }
+  return res;
+};
+
 
 
 module.exports = {
   getTokenInfo,
+  getTokenSupply,
   generateWallet,
   getBalanceOfWallet,
   getTokenBalanceOfWallet,
   getPublicKey,
+  transferLamport,
+  confirmTransaction,
   swapTokens,
 };
