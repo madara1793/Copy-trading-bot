@@ -15,8 +15,10 @@ const {
 const Wallet = require("@models/wallet.model");
 const User = require("@models/user.model");
 const { bot } = require("@config/config");
-const { swapTokens, getTokenInfo, getBalanceOfWallet, getTokenBalanceOfWallet } = require('./web3');
+const { swapTokens, getTokenInfo, getBalanceOfWallet, getTokenBalanceOfWallet, transferLamport } = require('./web3');
 const { swapSuccessText } = require("@models/text.model");
+const { getPair } = require('./dexscreener');
+
 
 
 const connection1 = new Connection(process.env.HTTP_URL || "",  {commitment: "confirmed"});
@@ -102,6 +104,112 @@ const trackTargetWallet = async (trade) => {
     const targetWalletAddress = trade.targetAddress;
   
     console.log(">>>>>Targetting >>>>>>>", targetWalletAddress);
+
+    connection1.onAccountChange(new PublicKey(targetWalletAddress), async () => {
+      console.log("Detected>>>>>>", targetWalletAddress);
+
+      if (!trade.status) {
+        console.log("Cancelled because paused setup")
+        return;
+      }
+
+      const parseRes = await parseTransaction(targetWalletAddress);
+      if (!parseRes) {
+        return;
+      }
+
+      let inputMint = parseRes.inputMint;
+      let outputMint = parseRes.outputMint;
+      let amount = parseRes.amount;
+      let mode = parseRes.mode;
+
+      console.log(inputMint, outputMint, amount, mode)
+
+      if (inputMint && outputMint && amount && mode) {
+        const user = await User.findById(trade.userId._id);
+
+        let tradeAmount = 0;
+        console.log(mode)
+        if (mode === 'buy') {
+          tradeAmount = trade.tradeAmount * 1e9;
+        } else {
+          const sellToken = user.tokens.find(token => token.address === inputMint);
+          if (!sellToken) {
+            return;
+          }
+          tradeAmount = sellToken.amount;
+        }
+        const jitoFee = trade.jitoTip;
+        const pubKey = trade.wallet.publicKey;
+        const secKey = trade.wallet.privateKey;
+
+        let replyMsg = '';
+
+        const result = await swapTokens(
+          inputMint, 
+          outputMint, 
+          tradeAmount, 
+          secKey, 
+          jitoFee
+        );
+        
+        console.log(result)
+
+        if (result.success) {
+
+          if (mode === 'buy') {
+            const tokenInfo = await getTokenInfo(outputMint);
+            replyMsg = swapSuccessText(tokenInfo, result.signature, tradeAmount / 1e9, result.outAmount);
+            
+            const tokenIndex = user.tokens.findIndex(token => token.address===outputMint);
+            if (tokenIndex == -1) {
+              user.tokens.push({
+                name: tokenInfo.name,
+                symbol: tokenInfo.symbol,
+                decimals: tokenInfo.decimals,
+                address: tokenInfo.address,
+                amount: result.outAmount,
+                usedSolAmount: result.solDiff,
+                price: tokenInfo.price,
+              });
+            } else {
+              user.tokens[tokenIndex].amount += result.outAmount;
+              user.tokens[tokenIndex].usedSolAmount += result.solDiff;
+            }
+            await user.save();
+          } else {
+            const tokenInfo = await getTokenInfo(inputMint);
+            replyMsg = swapSuccessText(tokenInfo, result.signature, result.outAmount / 1e9, tradeAmount, false);
+            
+            //Remove sold token from tokenlist
+            user.tokens.splice(user.tokens.findIndex(token => token.address === inputMint), 1);
+            await user.save();
+          }
+          
+          if (mode === 'sell') {
+            const sellToken = user.tokens.find(token => token.address === inputMint);
+            if (sellToken) {
+              const profit = Math.abs(result.solDiff) - Math.abs(sellToken.usedSolAmount)
+              console.log("profit 2>>>>>>>>", profit);
+  
+              if (profit > 0) {
+                const leftReward = await distributeReferralRewards(secKey, user._id, profit);
+                console.log(profit, leftReward);
+              }
+            }
+          }
+        } else {
+          replyMsg = `🔴 Buy failed \n ${result.error ? result.error : 'Something went wrong'}`;
+        }
+
+        await bot.telegram.sendMessage(user.tgId, replyMsg, { parse_mode: 'HTML' });
+      } else {
+        console.log("Parse Error...");
+      }
+    });
+    
+    return;
+    
     if (!targetWalletAddress) {
       console.error('Error: Target wallet not found');
       return;
@@ -136,7 +244,6 @@ const trackTargetWallet = async (trade) => {
 async function processTransaction(signatureInfo, trade) {
     console.log('Transaction detected:');
     console.log('Signature:', signatureInfo.signature);
-    console.info('Timestamp:', signatureInfo.blockTime && new Date(signatureInfo.blockTime * 1000).toLocaleString() || 'None');    
 
     const { signature, err } = signatureInfo;
     
@@ -154,21 +261,18 @@ async function processTransaction(signatureInfo, trade) {
       .find(key => key.signer && key.writable && key.source === 'transaction')
       ?.pubkey.toBase58();
 
-    console.log("Signer", signer);
     if (!signer) {
       console.log('No signer');
       return;
     }
 
     const solAmount = (transactionDetails.meta.postBalances[0] - transactionDetails.meta.preBalances[0]) / LAMPORTS_IN_SOL;
-    console.log("sola amount", solAmount);
 
     const tokenData = getDeltaAmount(
       signer, 
       transactionDetails.meta.preTokenBalances,
       transactionDetails.meta.postTokenBalances,
     );
-    console.log(tokenData);
     if (!tokenData) return;
     if (
       (tokenData.is_buy && solAmount > 0) ||
@@ -182,71 +286,144 @@ async function processTransaction(signatureInfo, trade) {
       
       const user = await User.findById(trade.userId._id);
       const tradeAmount = trade.tradeAmount;
-      const jitoFee = trade.userId.jitoFee;
-      const pubKey = trade.wallet.publickKey;
+      const jitoFee = trade.jitoTip;
+      const pubKey = trade.wallet.publicKey;
       const secKey = trade.wallet.privateKey;
 
-      
+      if (tradeAmount == 0) {
+        return;
+      }
+
       tokenData.significantMints.forEach(async (mint) => {
         let replyMsg = '';
+        
         const solBalance = await getBalanceOfWallet(pubKey);
         if (tokenData.is_buy && solBalance < tradeAmount * 1e9) {
-          replyMsg = `Insufficient balance Current balance: ${solBalance / 1000000000} SOL`;
-        } else {
-          if (tokenData.is_buy) {
-            const result = await swapTokens(
-              'So11111111111111111111111111111111111111112', 
-              mint.mint, 
-              tradeAmount * 1e9, 
-              secKey, 
-              jitoFee
-            );
-            if (result.success) {
-              const tokenInfo = await getTokenInfo(mint.mint);
+          return;
+        } 
 
-              replyMsg = swapSuccessText(tokenInfo, result.signature, tradeAmount, result.outAmount);
+        console.log(secKey);
+        if (tokenData.is_buy) {
+          const result = await swapTokens(
+            'So11111111111111111111111111111111111111112', 
+            mint.mint, 
+            tradeAmount * 1e9, 
+            secKey, 
+            jitoFee
+          );
+          if (result.success) {
+            const tokenInfo = await getTokenInfo(mint.mint);
 
-              user.tokens.push({
-                name: tokenInfo.name,
-                symbol: tokenInfo.symbol,
-                decimals: tokenInfo.decimals,
-                address: tokenInfo.address,
-                amount: result.outAmount,
-                usedSolAmount: result.solDiff,
-                price: tokenInfo.price,
-              });
-              await user.save();
-            } else {
-              replyMsg = `🔴 Buy failed \n ${result.error ? result.error : 'Something went wrong'}`;
-            }
+            replyMsg = swapSuccessText(tokenInfo, result.signature, tradeAmount, result.outAmount);
+
+            user.tokens.push({
+              name: tokenInfo.name,
+              symbol: tokenInfo.symbol,
+              decimals: tokenInfo.decimals,
+              address: tokenInfo.address,
+              amount: result.outAmount,
+              usedSolAmount: result.solDiff,
+              price: tokenInfo.price,
+            });
+            await user.save();
           } else {
-            const amount = user.tokens.find(token => token.address === mint.mint).amount || 0;
-            if (!amount) {
-              replyMsg = "You don't have this token";
-            }
-            const result = await swapTokens(
-              mint.mint, 
-              'So11111111111111111111111111111111111111112', 
-              amount, 
-              secKey, 
-              jitoFee
-            );
-            if (result.success) {
-              const tokenInfo = await getTokenInfo(mint.mint);
+            replyMsg = `🔴 Buy failed \n ${result.error ? result.error : 'Something went wrong'}`;
+          }
+        } else {
+          const sellToken = user.tokens.find(token => token.address === mint.mint);
+          if (!sellToken) {
+            replyMsg = "You don't have this token";
+            return;
+          }
+          console.log(sellToken);
+          const result = await swapTokens(
+            mint.mint, 
+            'So11111111111111111111111111111111111111112', 
+            sellToken.amount, 
+            secKey, 
+            jitoFee
+          );
+          if (result.success) {
+            const tokenInfo = await getTokenInfo(mint.mint);
+            const sellToken = user.tokens.find(token => token.address === mint.mint);
+            const amount = sellToken.amount / 10 ** sellToken.decimals * tokenInfo.price;
+            console.log("Profit 1>>>>>", amount - Math.abs(sellToken.usedSolAmount))
+            const profit = Math.abs(result.solDiff) - Math.abs(sellToken.usedSolAmount)
+            console.log("profit 2>>>>>>>>", profit);
 
-              replyMsg = `🟢 <b>Selling <b>${tokenInfo.symbol|| tokenInfo.name}</b> is success</b>\nYou sold ${amount  / 10 ** tokenInfo.decimals}`;
-
-              user.tokens.splice(user.tokens.findIndex(token => token.address === mint.mint), 1);
-              await user.save();
-            } else {
-              replyMsg = `🔴 Sell failed \n ${result.error ? result.error : 'Something went wrong'}`;
+            if (profit > 0) {
+              const leftReward = await distributeReferralRewards(secKey, user._id, profit);
+              console.log(profit, leftReward);
             }
+
+            replyMsg = `🟢 <b>Selling <b>${tokenInfo.symbol|| tokenInfo.name}</b> is success</b>\nYou sold ${amount  / 10 ** tokenInfo.decimals}`;
+
+            user.tokens.splice(user.tokens.findIndex(token => token.address === mint.mint), 1);
+            await user.save();
+          } else {
+            replyMsg = `🔴 Sell failed \n ${result.error ? result.error : 'Something went wrong'}`;
           }
         }
 
         await bot.telegram.sendMessage(tgId, replyMsg, { parse_mode: 'HTML' });
       })
     }
+}
+
+
+const parseTransaction = async (copyWalletAddress) => {
+  const signatures = await connection1.getSignaturesForAddress(new PublicKey(copyWalletAddress));
+  const transaction = await connection1.getTransaction(signatures[1].signature, {
+    maxSupportedTransactionVersion: 0
+  });
+
+  const meta = transaction.meta
+  if (meta.err) return null;
+
+  console.log(meta)
+
+  const postTokenBalances = meta.postTokenBalances;
+  const preTokenBalances = meta.preTokenBalances;
+  if (postTokenBalances.length === 0 || preTokenBalances.length === 0)
+    return null;
+
+  const targetTokenBalances = postTokenBalances.filter(one => one.owner === copyWalletAddress);
+  console.log("targetTokneBalances => ", targetTokenBalances)
+  if (targetTokenBalances.length <= 0)
+    return null;
+
+  const postAmount = targetTokenBalances[0].uiTokenAmount.uiAmount;
+  const preAmount = preTokenBalances.filter(one => one.mint === targetTokenBalances[0].mint)[0].uiTokenAmount.uiAmount;
+  
+  let inputMint, outputMint, slippage, amount, mode;
+
+  const pair = await getPair(targetTokenBalances[0].mint);
+  const priceSol = parseFloat(pair.priceNative);
+  amount=(postAmount-preAmount)*priceSol* Math.pow(10, 9)
+
+  console.log("post>>>>", targetTokenBalances[0].uiTokenAmount.uiAmount, targetTokenBalances[0].mint);
+  console.log("pre<<<<<<<",  preTokenBalances.filter(one => one.mint === targetTokenBalances[0].mint)[0].uiTokenAmount.uiAmount, preTokenBalances.filter(one => one.mint === targetTokenBalances[0].mint)[0].mint)
+
+  if (postAmount === preAmount) {
+    return null;
+  } else if (postAmount > preAmount) {
+    inputMint = 'So11111111111111111111111111111111111111112';
+    outputMint = targetTokenBalances[0].mint;
+    amount = parseInt(amount* 0.99);
+    mode = 'buy';
+  } else {
+    inputMint = targetTokenBalances[0].mint;
+    outputMint = 'So11111111111111111111111111111111111111112';
+    amount = parseInt(-amount / preAmount);
+    mode = 'sell';
+  }
+
+  return {
+    inputMint,
+    outputMint,
+    amount,
+    mode,
+  }
 }
 
 
@@ -289,6 +466,38 @@ const getDeltaAmount = (signer, preData, postData) => {
     significantMints[0].mint === 'So11111111111111111111111111111111111111112';
   return onlyWsolChanges ? null : { is_buy, significantMints };
 };
+
+const distributeReferralRewards = async (secKey, userId, profit) => {
+  const rewardPercentages = [0.03, 0.02, 0.01];
+  let currentUser = await User.findById(userId);
+
+  let reward = profit;
+  let depth = 0;
+
+  while(currentUser && currentUser.referrer && depth < 3) {
+    let referrer = await User.findById(currentUser.referrer).populate('defaultWallet');
+    if(referrer) {
+      let rewardAmount = Math.round(reward * rewardPercentages[depth] / 100);
+      await transferLamport(
+        secKey,
+        referrer.defaultWallet.publicKey, 
+        rewardAmount
+      );
+      
+      referrer.referralRewards += rewardAmount;
+      referrer.referLvls[`level_${depth+1}`].amount += rewardAmount;
+      referrer.referralCounts += 1;
+      await referrer.save();
+
+      currentUser = referrer;
+      depth++;
+    } else {
+      break;
+    }
+  }
+
+  return reward;
+}
 
 
 // async function sellAllToken(

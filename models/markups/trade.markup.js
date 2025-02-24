@@ -58,6 +58,14 @@ const tradeSettingMarkup = (trade) => {
       Markup.button.callback(`🔎 Max Trigger Amount: ${trade.maxTriggerAmount || 'N/A'}`, 'Set Max Trigger Amount'),
     ],
     [
+      Markup.button.callback(`💰 Priority Fee: ${trade.priorityFee} SOL`, 'Set Copy Priority Fee'),
+      Markup.button.callback(`💰 Jito Tip: ${trade.jitoTip} SOL`, 'Set Copy Jito Tip'),
+    ],
+    [
+      Markup.button.callback(`💰 Trade Amount ${trade.tradeAmount} SOL`, 'Set Copy Trade Amount'),
+      Markup.button.callback(`💰 Slippage (${trade.slippage*100}%)`, 'Set Copy Slippage'),
+    ],  
+    [
       Markup.button.callback(`Active: ${trade.status ? '🟢':'🔴'}`, 'Set Trade Status'),
       Markup.button.callback(`Delete Config`, 'Delete Trade Config'),
     ],

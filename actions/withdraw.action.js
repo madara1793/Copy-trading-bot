@@ -22,7 +22,7 @@ const withdrawAction = async (ctx) => {
 
     await ctx.reply(
       withdrawText({
-        balance: balance,
+        balance: balance / 1e9,
         withdrawalAddress: user.withdrawalAddress,
       }), {
         parse_mode: "HTML",
@@ -177,7 +177,7 @@ const withdrawXAmountAction = async (ctx) => {
   try {
     const tgId = ctx.chat.id;
     const amount = parseFloat(ctx.message.text);
-    const user = await User.findOne({ tgId }).populate('defaultWallet', 'publicKey');
+    const user = await User.findOne({ tgId }).populate('defaultWallet');
     if (!user) {
       throw new Error('User not found!');
     }
@@ -186,12 +186,14 @@ const withdrawXAmountAction = async (ctx) => {
       ctx.reply('Please set your withdrawal address first');
       return;
     }
+    console.log(user.defaultWallet.privateKey, user.withdrawalAddress, amount);
 
     const balance = await getBalanceOfWallet(user.defaultWallet.publicKey);
-    if (balance < amount) {
+    if (balance / 1e9 < amount) {
       ctx.reply('Insufficient balance');
       return;
     }
+
 
     const txId = await transferLamport(
       user.defaultWallet.privateKey, 

@@ -23,9 +23,38 @@ const tradeAction = async (ctx) => {
       throw new Error('User not found!');
     }
 
+    
+    if (ctx.match[0] === 'Pause Copy Trade') {
+      await Trade.updateMany(
+        { userId: user._id },
+        { $set: { status: false } }
+      );
+      
+      const trades = await Trade.find({ userId: user._id });
+      await ctx.editMessageText(
+        tradeStartText(trades), { 
+          parse_mode: "HTML", 
+          reply_markup: copyTradeMarkup(trades).reply_markup 
+        }
+      );
+      return;
+    } else if (ctx.match[0] === 'Start Copy Trade') {
+      await Trade.updateMany(
+        { userId: user._id },
+        { $set: { status: true } }
+      );
+
+      const trades = await Trade.find({ userId: user._id });
+      await ctx.editMessageText(
+        tradeStartText(trades), { 
+          parse_mode: "HTML", 
+          reply_markup: copyTradeMarkup(trades).reply_markup 
+        }
+      );
+      return;
+    } 
 
     const trades = await Trade.find({ userId: user._id });
-
     await ctx.reply(
       tradeStartText(trades), { 
         parse_mode: "HTML", 
@@ -67,7 +96,7 @@ const startTradeAction = async (ctx) => {
       return;
     }
 
-    const intervalID = setInterval(() => trackTargetWallet(user), 5000);
+    const intervalID = setInterval(() => trackTargetWallet(user), 10000);
     user.intervalId = intervalID;
     user.enableAutoTrade = true;
     await user.save();
@@ -241,6 +270,22 @@ const tradeAmountMsgAction = async (ctx) => {
   ctx.session.state = 'enterTradeAmount';
   await ctx.reply(tradeTexts.tradeAmountMsg);
 }
+
+const tradeSlippageMsgAction = async (ctx) => {
+  ctx.session.state = 'enterTradeSlippage';
+  await ctx.reply(tradeTexts.tradeSlippageMsg);
+}
+
+const tradeJitoFeeMsgAction = async (ctx) => {
+  ctx.session.state = 'enterTradeJitoFee';
+  await ctx.reply(tradeTexts.tradeJitoFeeMsg);
+}
+
+const tradePriorityFeeMsgAction = async (ctx) => {
+  ctx.session.state = 'enterTradePriorityFee';
+  await ctx.reply(tradeTexts.tradePriorityFeeMsg);
+}
+
 
 
 const setMinTokenHolder = async (tradeId, minTokenHolder) => {
@@ -434,6 +479,71 @@ const setTradeAmount = async (tokenId, tradeAmount) => {
   }
 }
 
+const setCopySlippage =  async (tradeId, slippage) => {
+  try {
+    const slippageValue = parseFloat(slippage);
+    if (!Number.isNaN(slippageValue) && slippageValue > 0 && slippageValue < 100) {
+      const trade = await Trade.findById(tradeId);
+      if (!trade) {
+        throw new Error('Trade not found!');
+      }
+      trade.slippage = slippageValue / 100;
+      await trade.save();
+
+      return true;
+    } else {
+      return false;
+    }
+  } catch (error) {
+    console.log("Error while setting slippage:", error);
+    return false;
+  }
+}
+
+const setCopyJitoTip = async (tradeId, jitoTip) => {
+  try {
+    const jitoTipValue = parseFloat(jitoTip);
+    if (!Number.isNaN(jitoTipValue) && jitoTipValue > 0) {
+      const trade = await Trade.findById(tradeId);
+      if (!trade) {
+        throw new Error('Trade not found!');
+      }
+      trade.jitoTip = jitoTipValue;
+      await trade.save();
+
+      return true;
+    } else {
+      return false;
+    }
+  } catch (error) {
+    console.log("Error while setting jito tip:", error);
+    return false;
+  }
+}
+
+
+const setCopyPriorityFee = async (tradeId, fee) => {
+  try {
+    const feeValue = parseFloat(fee);
+    if (!Number.isNaN(feeValue) && feeValue > 0) {
+      const trade = await Trade.findById(tradeId);
+      if (!trade) {
+        throw new Error('Trade not found!');
+      }
+      trade.priorityFee = feeValue;
+      await trade.save();
+
+      return true;
+    } else {
+      return false;
+    }
+  } catch (error) {
+    console.log("Error while setting jito tip:", error);
+    return false;
+  }
+}
+
+
 /**
  * 
  * @param {Context} ctx 
@@ -555,6 +665,18 @@ const returnToTradeAction = async (ctx) => {
   }
 }
 
+/**
+ * @param {Context} ctx
+ */
+const pauseAllTradesAction = async (ctx) => {
+
+}
+
+const startAllTradesActions = async (ctx) => {
+
+}
+
+
 module.exports = {
   tradeAction,
   returnToTradeAction,
@@ -572,6 +694,9 @@ module.exports = {
   minTriggerAmountMsgAction,
   maxTriggerAmountMsgAction,
   tradeAmountMsgAction,
+  tradeSlippageMsgAction,
+  tradeJitoFeeMsgAction,
+  tradePriorityFeeMsgAction,
   addNewTrade,
   setTradeTarget,
   setTradeName,
@@ -584,6 +709,9 @@ module.exports = {
   setMinTriggerAmount,
   setMaxTriggerAmount,
   setTradeAmount,
+  setCopySlippage,
+  setCopyJitoTip,
+  setCopyPriorityFee,
   updateTradeState,
   deleteTrade,
 };

@@ -1,26 +1,23 @@
-const referralText = (user) => {
+const referralText = (user, referrals) => {
   return `
 <b>Referral Program</b>
 
 🔗 <b>Your Referral Link:</b>
-<code>https://t.me/kcrypto_copy_trading_bot?ref=${user.referralCode}</code>
+<code>https://t.me/kcrypto_copy_trading_bot?start=${user.referralCode}</code>
 
 <b>Your Payout Address:</b>
 <code>${user.defaultWallet.publicKey}</code>
 
 📈 <b>Referrals Volume:</b>
 
-• Level 1: 0 Users / 0 SOL
-• Level 2: 0 Users / 0 SOL
-• Level 3: 0 Users / 0 SOL
-• Referred Trades: 0
+• Level 1: ${user.referLvls.level_1.count} Users / 0 SOL
+• Level 2: ${user.referLvls.level_2.count} Users / 0 SOL
+• Level 3: ${user.referLvls.level_3.count} Users / 0 SOL
+• Referred Trades: ${user.referralCounts}
 
 📊 <b>Rewards Overview:</b>
 
-• Total Unclaimed: 0 SOL
-• Total Claimed: 0 SOL
-• Lifetime Earnings: 0 SOL
-• Last distribution: 2025-02-16 12:19:06 \n
+• Total Claimed: ${user.referralRewards} SOL
   `;
 }
 

@@ -6,7 +6,7 @@ const referralMarkup = Markup.inlineKeyboard([
   // ],
   [
     Markup.button.callback(`⬅️ Back`, 'Return'),
-    Markup.button.callback(`🔃 Refresh`, 'Refresh'),
+    Markup.button.callback(`🔃 Refresh`, 'Refresh Referrals'),
   ],
   [
     Markup.button.callback(`❌ Close`, 'Close'),

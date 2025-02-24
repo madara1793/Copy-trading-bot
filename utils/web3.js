@@ -35,6 +35,11 @@ async function getTokenInfo(mintAddress) {
   }
 }
 
+const getTokenSupply = async (mint) => {
+  const res = await connection.getTokenSupply(new PublicKey(mint));
+  return res.value;
+};
+
 /**
  * Generate new Solana wallet.
  * @returns Return object of publicKey and privateKey
@@ -153,14 +158,11 @@ const swapTokens = async (inputAddr, outputAddr, amount, secretKey, jitoFee) => 
   if (quote.error) {
     return { success: false, error: quote.error };
   }
-  console.log("-----> Quote: ", quote);
 
   const swapTransaction = await getSerializedTransaction(quote, keyPair.publicKey.toString());
   const transaction = await getDeserialize(swapTransaction);
-  console.log("-----> Swap Tx: ", transaction);
 
   const signedTransaction = await signTransaction(transaction, keyPair);
-  console.log("-----> Signed Tx: ", signedTransaction);
 
   const result = await sendBundle([signedTransaction], keyPair, jitoFee);
   console.log('sendBundle result:', result);
@@ -217,6 +219,7 @@ const confirmTransaction = async (txid) => {
 
 module.exports = {
   getTokenInfo,
+  getTokenSupply,
   generateWallet,
   getBalanceOfWallet,
   getTokenBalanceOfWallet,

@@ -1,20 +1,23 @@
 const User = require('@models/user.model');
 const Wallet = require('@models/wallet.model');
 
-const startText = (user) => {
+const startText = (wallets) => {
+  const balances = wallets.map((wallet, index) => {
+    return `→ W${index+1}:
+<code>${wallet.publicKey}</code>
+Balance: ${wallet.balance} SOL
+`;
+});
+
   return `
-    🎉 Welcome <b>@${user.username}</b>! 
- 
-🚀 Next-Gen Copy Trading Bot 💰
+    🎉 Welcome to Mimic! 🎭
 
-Maximize profits effortlessly with our AI-powered Copy Trading Bot! 📈 Automatically mirror top traders' strategies, execute high-speed trades, and optimize every move with real-time market insights. Designed for precision, speed, and reliability, our bot ensures you stay ahead in the game—whether you're a beginner or a pro.
+Mimic success, maximize profits.
 
-✅ Smart Trade Execution ⚡
-✅ Real-Time Strategy Sync 🔄
-✅ Risk Management Controls 🛡️
-✅ Supports Multiple Exchanges 🌎
+🎭Your Solana Wallet Address:
+${balances.join('')}
 
-Trade smarter, not harder. Start copying success today! 🚀🔥
+Get started below👇! 
   `
 };
 
@@ -142,13 +145,21 @@ How it works:
 Join the trading revolution today! 🌟
 `;
 
-const swapSuccessText = (tokenInfo, signature, solAmount, tokenAmount) => {
-  return `🟢 <b>Buying <b>${tokenInfo.symbol || tokenInfo.name}</b> is success</b>.
-You bought ${tokenAmount / 10 ** tokenInfo.decimals} <b>${
+const swapSuccessText = (tokenInfo, signature, solAmount, tokenAmount, isBuy=true) => {
+  return `🟢 <b>${isBuy?'Buying': 'Selling'} <b>${tokenInfo.symbol || tokenInfo.name}</b> is success</b>.
+You ${isBuy?'bought':'sold'} ${tokenAmount / 10 ** tokenInfo.decimals} <b>${
     tokenInfo.symbol || tokenInfo.name
   }</b> using <b>${solAmount}</b> SOL.
 📝<a href='https://solscan.io/tx/${signature}'>Transaction</a>`;
 };
+
+const swapFailedText = (signature, errorMsg) => {
+  return `
+⛔ Transaction failed
+${errorMsg}
+📝<a href='https://solscan.io/tx/${signature}'>Transaction</a>
+`;
+}
 
 
 module.exports = { 
@@ -162,5 +173,6 @@ module.exports = {
   tradeStartText, 
   followingTraderText,
   startText, 
-  swapSuccessText 
+  swapSuccessText,
+  swapFailedText,
 };

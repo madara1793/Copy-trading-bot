@@ -47,7 +47,20 @@ const tradeSchema = new Schema({
   },
   minTriggerTokenHolders: {
     type: Number,
-  }
+  },
+  priorityFee: {
+    type: Number,
+    default: 0.001,
+  },
+  jitoTip: {
+    type: Number,
+    default: 0.001,
+  },
+  slippage: {
+    type: Number,
+    default: 0.02,
+  },
+  
 });
 
 

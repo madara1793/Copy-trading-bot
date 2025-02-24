@@ -15,8 +15,7 @@ const startMarkUp = (parseMode) => {
           Markup.button.callback("📈 Copy Trade", "Copy Trade"),
         ],
         [
-          Markup.button.callback('➕ Add Top Trader Wallet', 'Add Top Trader'),
-          Markup.button.callback('🪪 My Following Wallets', 'Following Traders'),
+          Markup.button.callback('👜 Positions', 'Position'),
         ],
         [
           Markup.button.callback('💰 Withdraw', 'Withdraw'),

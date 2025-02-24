@@ -49,6 +49,18 @@ const tradeAmountMsg = `
   Please enter the trade amount:
 `;
 
+const tradeSlippageMsg = `
+  Please enter the slippage percentage(1-100%):
+`;
+
+const tradeJitoFeeMsg = `
+  Please enter the Jito tip amount:
+`;
+
+const tradePriorityFeeMsg = `
+  Please enter the priority fee:
+`;
+
 
 module.exports = {
   tradeMainText,
@@ -60,5 +72,8 @@ module.exports = {
   maxTokenAgeMsg,
   minTriggerAmountMsg,
   maxTriggerAmountMsg,
-  tradeAmountMsg
+  tradeAmountMsg,
+  tradeSlippageMsg,
+  tradeJitoFeeMsg,
+  tradePriorityFeeMsg,
 }

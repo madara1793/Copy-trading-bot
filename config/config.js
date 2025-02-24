@@ -1,7 +1,7 @@
 const { Telegraf, session } = require("telegraf");
 const { Connection, PublicKey } = require("@solana/web3.js");
 const mongoose = require("mongoose");
-
+const User = require("@models/user.model")
 
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
 const MONGO_URI = process.env.MONGO_URI || "";
@@ -17,7 +17,7 @@ const connection = new Connection(HTTP_URL, {
 
 mongoose
   .connect(MONGO_URI)
-  .then(() => {
+  .then(async () => {
     console.log("DB Connected!!!")
   })
   .catch((error) => {
