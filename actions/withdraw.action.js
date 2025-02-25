@@ -1,8 +1,11 @@
 const { Context } = require('telegraf');
+const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
 
 const User = require('@models/user.model');
+const Wallet = require('@models/wallet.model');
 const { withdrawMarkup } = require('@models/markups/withdraw.markup');
-const { withdrawText, WithdrawalUpdateText, WithdrawAmountText, withdrawSuccessText, withdrawFailedText } = require('@models/texts/withdraw.text');
+const { defaultWalletMarkup } = require('@models/markup.model');
+const { withdrawText, WithdrawalUpdateText, WithdrawAmountText, WalletNotFoundText, withdrawSuccessText, withdrawFailedText } = require('@models/texts/withdraw.text');
 const { getBalanceOfWallet, transferLamport, confirmTransaction } = require('@utils/web3');
 
 
@@ -13,7 +16,7 @@ const { getBalanceOfWallet, transferLamport, confirmTransaction } = require('@ut
 const withdrawAction = async (ctx) => {
   try {
     const tgId = ctx.chat.id;
-    const user = await User.findOne({ tgId }).populate('defaultWallet', 'publicKey');
+    const user = await User.findOne({ tgId }).populate('defaultWallet', 'publicKey name');
     if (!user) {
       throw new Error('User not found!');
     }
@@ -22,6 +25,7 @@ const withdrawAction = async (ctx) => {
 
     await ctx.reply(
       withdrawText({
+        wallet: user.defaultWallet,
         balance: balance / 1e9,
         withdrawalAddress: user.withdrawalAddress,
       }), {
@@ -50,6 +54,72 @@ const setWithdrawalMsgAction = async (ctx) => {
 
 
 /**
+ * @param {Context} ctx
+ */
+const switchWithdrawWallet = async (ctx) => {
+  const tgId = ctx.chat.id;
+
+  const user = await User.findOne({ tgId });
+  if (!user) {
+    throw new Error('User not found!');
+  }
+
+  await ctx.reply(
+    'Please select the wallet number you want to withdraw',
+    { 
+      parse_mode: 'Markdown', 
+      reply_markup: defaultWalletMarkup(user.wallets, 'withdraw').reply_markup 
+    }
+  );
+}
+
+/**
+ * @param {Context} ctx
+ */
+const switchWithdrawWalletAction = async (ctx) => {
+  try {
+    const index = ctx.update.callback_query.data.split("withdraw_wallet_")[1];
+    if (!index) {
+      return;
+    }
+
+    const tgId = ctx.chat.id;
+    const user = await User.findOne({ tgId });
+    if (!user) {
+      throw new Error('User not found!');
+    }
+
+    const wallet = await Wallet.findById(user.wallets[index], 'publicKey name');
+    if (!wallet) {
+      await ctx.reply(WalletNotFoundText);
+      return;
+    }
+    if (user.wallets[index]) {
+      user.defaultWallet = wallet._id;
+      await user.save();
+
+      const balance = await getBalanceOfWallet(wallet.publicKey);
+
+      await ctx.editMessageText(
+        withdrawText({
+          wallet: wallet,
+          balance: balance / 1e9,
+          withdrawalAddress: user.withdrawalAddress,
+        }), {
+          parse_mode: "HTML",
+          reply_markup: withdrawMarkup.reply_markup
+        }
+      )
+    } else {
+      await ctx.answerCbQuery('Wallet not found!', { show_alert: true });
+    }
+  } catch (error) {
+
+  }
+}
+
+
+/**
  * @param {Context} ctx 
  */
 const setWithdrawalAddress = async (ctx) => {
@@ -67,7 +137,8 @@ const setWithdrawalAddress = async (ctx) => {
 
     await ctx.reply(
       withdrawText({
-        balance: balance,
+        wallet: user.defaultWallet,
+        balance: balance / LAMPORTS_PER_SOL,
         withdrawalAddress: user.withdrawalAddress,
       }), {
         parse_mode: "HTML",
@@ -108,11 +179,10 @@ const withdraw50Action = async (ctx) => {
       balance / 2
     );
 
-    console.log('txId:', txId);
 
     await confirmTransaction(txId);
 
-    await ctx.reply(withdrawSuccessText(txId));
+    await ctx.reply(withdrawSuccessText(txId), { parse_mode: 'HTML' });
   } catch (error) {
     console.log('Error while withdraw50Action:', error);
     await ctx.reply(withdrawFailedText(error));
@@ -152,7 +222,7 @@ const withdrawAllAction = async (ctx) => {
 
     await confirmTransaction(txId);
 
-    await ctx.reply(withdrawSuccessText(txId));
+    await ctx.reply(withdrawSuccessText(txId), { parse_mode: 'HTML' });
 
   } catch (error) {
     console.log('Error while withdraw50Action:', error);
@@ -198,14 +268,14 @@ const withdrawXAmountAction = async (ctx) => {
     const txId = await transferLamport(
       user.defaultWallet.privateKey, 
       user.withdrawalAddress, 
-      amount,
+      amount * LAMPORTS_PER_SOL,
     );
 
     console.log('txId:', txId);
 
     await confirmTransaction(txId);
 
-    await ctx.reply(withdrawSuccessText(txId));
+    await ctx.reply(withdrawSuccessText(txId), { parse_mode: 'HTML' });
 
   } catch (error) {
     console.log('Error while withdraw50Action:', error);
@@ -222,4 +292,6 @@ module.exports = {
   withdraw50Action,
   withdrawAllAction,
   withdrawXAmountAction,
+  switchWithdrawWallet,
+  switchWithdrawWalletAction,
 }

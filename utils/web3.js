@@ -1,14 +1,13 @@
-const { Keypair, PublicKey, VersionedTransaction } = require('@solana/web3.js');
+const { AddressLookupTableAccount, Keypair, PublicKey, VersionedTransaction, SystemProgram, TransactionInstruction, TransactionMessage, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+const { searcherClient } = require("jito-ts/dist/sdk/block-engine/searcher");
 const { Metaplex } = require('@metaplex-foundation/js');
 const bs58 = require('bs58');
 
-const { connection } = require('@config/config');
+const { connection, bot } = require('@config/config');
 const { uint8ArrayToHex } = require("@utils/functions");
-const { getTokenPrice, getQuoteForSwap, getSerializedTransaction } = require('./jupiter');
+const { getTokenPrice, getQuoteForSwap, getSwapInstruction, getSerializedTransaction } = require('./jupiter');
 const { sendBundle } = require('./jito');
-const { SystemProgram } = require('@solana/web3.js');
-const { TransactionMessage } = require('@solana/web3.js');
-
+const { pendingTxText } = require('@models/text.model');
 
 /**
  * Get token metadata from its address
@@ -22,7 +21,6 @@ async function getTokenInfo(mintAddress) {
   try {
     const tokenMetadata = await metaplex.nfts().findByMint({ mintAddress: mint });
     const price = await getTokenPrice(mintAddress);
-    console.log('Token Name:', tokenMetadata.mint.supply);
     return {
       name: tokenMetadata.name,
       symbol: tokenMetadata.symbol,
@@ -101,7 +99,8 @@ const getTokenBalanceOfWallet = async (walletAddr, tokenAdddr) => {
  * @returns 
  */
 const getPublicKey = (privateKey) => {
-  const privateKeyUint8 = bs58.default.decode(privateKey);
+  const hexRegex = /^[0-9a-fA-F]+$/;
+  const privateKeyUint8 = hexRegex.test(privateKey) ? Buffer.from(privateKey, 'hex') : bs58.decode(privateKey)
 
   const keyPair = Keypair.fromSecretKey(privateKeyUint8);
   return keyPair.publicKey.toString();
@@ -141,6 +140,53 @@ const signTransaction = async (transaction, keyPair) => {
   }
 }
 
+const deserializeInstruction = (instruction) => {
+  return new TransactionInstruction({
+    programId: new PublicKey(instruction.programId),
+    keys: instruction.accounts.map((key) => ({
+        pubkey: new PublicKey(key.pubkey),
+        isSigner: key.isSigner,
+        isWritable: key.isWritable,
+    })),
+    data: Buffer.from(instruction.data, "base64"),
+  });
+};
+
+
+const getAddressLookupTableAccounts = async (
+  keys
+) => {
+  const addressLookupTableAccountInfos =
+  await connection.getMultipleAccountsInfo(
+      keys.map((key) => new PublicKey(key))
+  );
+
+  return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
+    const addressLookupTableAddress = keys[index];
+    if (accountInfo) {
+        const addressLookupTableAccount = new AddressLookupTableAccount({
+        key: new PublicKey(addressLookupTableAddress),
+        state: AddressLookupTableAccount.deserialize(accountInfo.data),
+        });
+        acc.push(addressLookupTableAccount);
+    }
+
+    return acc;
+    }, new Array());
+};
+
+
+const getJitoTipAccount = async () => {
+  const blockchainEngineUrl = process.env.BLOCKCHAIN_ENGINE_URL;
+  const searcher = searcherClient(blockchainEngineUrl, undefined);
+  const _tipAccount = (await searcher.getTipAccounts()).value[0];
+  const tipAccount = new PublicKey(_tipAccount);
+
+  return tipAccount;
+
+}
+
+
 /**
  *
  * @param {string} inputAddr
@@ -149,26 +195,70 @@ const signTransaction = async (transaction, keyPair) => {
  * @param {string} secretKey
  * @param {number} jitoFee
  */
-const swapTokens = async (inputAddr, outputAddr, amount, secretKey, jitoFee) => {
-  const keyPair = Keypair.fromSecretKey(bs58.default.decode(secretKey));
+const swapTokens = async (inputAddr, outputAddr, amount, secretKey, jitoFee, tgId = null) => {
+  const hexRegex = /^[0-9a-fA-F]+$/;
+
+  const keyPair = Keypair.fromSecretKey(hexRegex.test(secretKey) ? 
+    Buffer.from(secretKey, 'hex') :
+    bs58.decode(secretKey)
+  );
   const prevSolBalance = await getBalanceOfWallet(keyPair.publicKey.toString());
-  console.log("-----> Previous Sol: ", prevSolBalance);
   
-  const quote = await getQuoteForSwap(inputAddr, outputAddr, amount);
+  const quote = await getQuoteForSwap(inputAddr, outputAddr, parseInt(amount * 0.99));
   if (quote.error) {
     return { success: false, error: quote.error };
   }
 
-  const swapTransaction = await getSerializedTransaction(quote, keyPair.publicKey.toString());
-  const transaction = await getDeserialize(swapTransaction);
+  const { addressLookupTableAddresses, swapInstruction, setupInstructions } = await getSwapInstruction(quote, keyPair.publicKey.toString());
 
-  const signedTransaction = await signTransaction(transaction, keyPair);
 
-  const result = await sendBundle([signedTransaction], keyPair, jitoFee);
+  // Jito Fee Instruction
+  const tipAccount = await getJitoTipAccount();
+  const jitoTipInstruction = SystemProgram.transfer({
+    fromPubkey: keyPair.publicKey,
+    toPubkey: tipAccount,
+    lamports: Math.floor(jitoFee * LAMPORTS_PER_SOL),
+  });
+
+  // 1% Swap Fee Instruction
+  const lamports = inputAddr === 'So11111111111111111111111111111111111111112' ? amount * 0.01 : quote.outAmount * 0.01;
+  const feeInstruction = SystemProgram.transfer({
+    fromPubkey: keyPair.publicKey,
+    toPubkey: new PublicKey(process.env.FEE_COLLECTOR),
+    lamports: Math.floor(lamports),
+  });
+  
+  const instructions = [
+    jitoTipInstruction,
+    ...setupInstructions.map(deserializeInstruction),
+    deserializeInstruction(swapInstruction),
+    feeInstruction,
+  ];
+
+  const addressLookupTableAccounts = [];
+  addressLookupTableAccounts.push(
+    ...(await getAddressLookupTableAccounts(addressLookupTableAddresses))
+  );
+    
+  const blockhash = (await connection.getLatestBlockhash()).blockhash;
+  const messageV0 = new TransactionMessage({
+    payerKey: keyPair.publicKey,
+    recentBlockhash: blockhash,
+    instructions,
+  }).compileToV0Message(addressLookupTableAccounts);
+
+  const feeVersionedTransaction = new VersionedTransaction(messageV0);
+  feeVersionedTransaction.sign([keyPair]);
+  
+  if (tgId) {
+    await bot.telegram.sendMessage(tgId, pendingTxText(feeVersionedTransaction.signatures[0]), { parse_mode: 'HTML' });
+  }
+
+  // Send Bundle
+  const result = await sendBundle([feeVersionedTransaction], keyPair, jitoFee);
   console.log('sendBundle result:', result);
 
   const laterSolBalance = await getBalanceOfWallet(keyPair.publicKey.toString());
-  console.log('-----> later Sol:', laterSolBalance);
 
   return {
     ...result,
@@ -178,7 +268,12 @@ const swapTokens = async (inputAddr, outputAddr, amount, secretKey, jitoFee) => 
 }
 
 const transferLamport = async (fromSecretKey, toPubliKey, lamports) => {
-  const payer = Keypair.fromSecretKey(bs58.default.decode(fromSecretKey));
+  const hexRegex = /^[0-9a-fA-F]+$/;
+
+  const payer = Keypair.fromSecretKey(hexRegex.test(fromSecretKey) ? 
+    Buffer.from(fromSecretKey, 'hex') :
+    bs58.decode(fromSecretKey)
+  );
   const payerBalance = await connection.getBalance(payer.publicKey);
 
   if (payerBalance < lamports) {
@@ -189,7 +284,7 @@ const transferLamport = async (fromSecretKey, toPubliKey, lamports) => {
     SystemProgram.transfer({
       fromPubkey: payer.publicKey,
       toPubkey: new PublicKey(toPubliKey),
-      lamports,
+      lamports: Math.floor(lamports),
     }),
   ];
   const blockhash = await connection.getLatestBlockhash().then(((res) => res.blockhash));
@@ -200,7 +295,7 @@ const transferLamport = async (fromSecretKey, toPubliKey, lamports) => {
   }).compileToV0Message();
 
   const transaction = new VersionedTransaction(messageV0);
-
+  
   transaction.sign([payer]);
   const txId = await connection.sendTransaction(transaction);
 

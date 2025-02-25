@@ -4,7 +4,7 @@ const getPair = (tokenAddress) => {
     .then((res) => res.json())
     .then(({ pairs }) => {
       if (pairs === null || pairs === undefined) {
-        throw new Error('No pair');
+        return null;
       }
 
       const pair = pairs.find(
@@ -12,7 +12,7 @@ const getPair = (tokenAddress) => {
           quoteToken.address === 'So11111111111111111111111111111111111111112'
       );
       if (pair === null || pair === undefined) {
-        throw new Error('No pair');
+        return null;
       }
       return pair;
     });

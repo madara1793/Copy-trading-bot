@@ -54,12 +54,11 @@ const createPositionMsgAction = async (ctx) => {
 const createPositionAction = async (ctx) => {
   try {
     const tgId = ctx.chat.id;
-    const user  = await User.findOne({ tgId });
-    const wallets = await Wallet.find({ userId: user._id });
+    const user  = await User.findOne({ tgId }).populate('defaultWallet');
 
     const walletText = 
       await Promise.all(
-        wallets.map(async (wallet, index) => {
+        [user.defaultWallet].map(async (wallet, index) => {
           const balance = await getBalanceOfWallet(wallet.publicKey);
           return `💳 W${index + 1}: ${balance / 1e9} SOL\n`
         })
@@ -185,6 +184,7 @@ const buyPosition = async (ctx) => {
       amount * 1e9,
       user.defaultWallet.privateKey,
       user.jitoFee,
+      tgId,
     );
     
     if (result.error) {
@@ -242,6 +242,8 @@ const sellPosition = async (ctx) => {
     if (!position) {
       throw new Error("Position not found!");
     }
+
+    console.log(position, percent)
     
     const result = await swapTokens(
       position.tokenInfo.address,
@@ -249,6 +251,7 @@ const sellPosition = async (ctx) => {
       percent / 100 * position.outAmount,
       user.defaultWallet.privateKey,
       user.jitoFee,
+      tgId
     );
     
     if (result.error) {

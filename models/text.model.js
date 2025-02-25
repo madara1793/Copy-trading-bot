@@ -145,13 +145,18 @@ How it works:
 Join the trading revolution today! 🌟
 `;
 
+const pendingTxText = (signature) => {
+  return `
+🕔 Transaction Sent
+  `;
+};
+
+
 const swapSuccessText = (tokenInfo, signature, solAmount, tokenAmount, isBuy=true) => {
   return `🟢 <b>${isBuy?'Buying': 'Selling'} <b>${tokenInfo.symbol || tokenInfo.name}</b> is success</b>.
-You ${isBuy?'bought':'sold'} ${tokenAmount / 10 ** tokenInfo.decimals} <b>${
-    tokenInfo.symbol || tokenInfo.name
-  }</b> using <b>${solAmount}</b> SOL.
-📝<a href='https://solscan.io/tx/${signature}'>Transaction</a>`;
-};
+You ${isBuy?'bought':'sold'} ${tokenAmount / 10 ** tokenInfo.decimals} <b>${tokenInfo.symbol || tokenInfo.name}</b> using <b>${solAmount}</b> SOL.
+📝<a href='https://solscan.io/tx/${signature}'>${signature}</a>
+`};
 
 const swapFailedText = (signature, errorMsg) => {
   return `
@@ -172,7 +177,8 @@ module.exports = {
   exportWalletKeyText,
   tradeStartText, 
   followingTraderText,
-  startText, 
+  startText,
+  pendingTxText,
   swapSuccessText,
   swapFailedText,
 };

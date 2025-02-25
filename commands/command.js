@@ -139,6 +139,7 @@ const setCommands = async () => {
       { command: '/start', description: 'Start the bot' },
       { command: '/wallets', description: 'Wallets' },
       { command: '/positions', description: 'Positions' },
+      { command: '/withdraw', description: 'Withdraw Sol' },
       { command: '/setting', description: 'Setting' },
       { command: '/help', description: 'Help' },
     ];

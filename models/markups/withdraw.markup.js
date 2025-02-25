@@ -7,7 +7,8 @@ const withdrawMarkup = Markup.inlineKeyboard([
     Markup.button.callback('X SOL', 'Withdraw X SOL'),
   ],
   [
-    Markup.button.callback('Set Address', 'Set Withdrawal Address'),
+    Markup.button.callback('Switch Wallet', 'Swtich Withraw Address'),
+    Markup.button.callback('Set Withdrawal Address', 'Set Withdrawal Address'),
   ],
   [
     Markup.button.callback('⬅️ Back', 'Return'),

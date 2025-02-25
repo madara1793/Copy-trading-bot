@@ -4,7 +4,6 @@ const { Markup } = require('telegraf');
  * 
  */
 const copyTradeMarkup = (trades) => {
-  console.log(trades);
   const buttons = trades.map((trade, index) => 
     Markup.button.callback(`${trade.name}`, `trade_${trade._id.toString()}`)
   );

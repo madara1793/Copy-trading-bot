@@ -65,6 +65,7 @@ bot.command("setting", settingCommand);
 bot.command("wallets", walletAction);
 
 bot.command("positions", positionActions.positionActions);
+bot.command("withdraw", withdrawActions.withdrawAction)
 
 
 bot.on("text", async (ctx) => {
@@ -381,7 +382,8 @@ bot.action('Withdraw 50%', withdrawActions.withdraw50Action);
 bot.action('Withdraw 100%', withdrawActions.withdrawAllAction);
 bot.action('Withdraw X SOL', withdrawActions.withdrawXMsgAction);
 bot.action('Set Withdrawal Address', withdrawActions.setWithdrawalMsgAction);
-
+bot.action('Swtich Withraw Address', withdrawActions.switchWithdrawWallet)
+bot.action(/withdraw_wallet_[A-Za-z0-9]+$/, withdrawActions.switchWithdrawWalletAction);
 
 /******************************* Positions ****************************/
 bot.action('Position', positionActions.positionActions);

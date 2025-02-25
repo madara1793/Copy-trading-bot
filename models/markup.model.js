@@ -116,6 +116,9 @@ const defaultWalletMarkup = (wallets, type) => {
     case 'export':
       buttonQuery = 'export_wallet_';
       break;
+    case 'withdraw':
+      buttonQuery = 'withdraw_wallet_';
+      break;
     default:
       break;
   }
