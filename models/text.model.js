@@ -158,11 +158,18 @@ You ${isBuy?'bought':'sold'} ${tokenAmount / 10 ** tokenInfo.decimals} <b>${toke
 📝<a href='https://solscan.io/tx/${signature}'>${signature}</a>
 `};
 
-const swapFailedText = (signature, errorMsg) => {
+const swapFailedText = (signature, errorMsg, isBuy = true, tokenInfo = null) => {
   return `
 ⛔ Transaction failed
+
+${tokenInfo && `
+${isBuy ? 'Buy':'Sell'} | Name: ${tokenInfo.name} | Price: ${tokenInfo.price}USD
+CA: <code>${tokenInfo.address}</code>
+`}
+
 ${errorMsg}
-📝<a href='https://solscan.io/tx/${signature}'>Transaction</a>
+${signature && `📝<a href='https://solscan.io/tx/${signature}'>Tx</a>`}
+
 `;
 }
 

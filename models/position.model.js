@@ -29,6 +29,12 @@ const PositionSchema = new Schema({
     decimals: Number,
     price: Number,
   },
+  jitoTip: {
+    type: Number,
+  },
+  slippage: {
+    type: Number,
+  },
   state: {
     type: Boolean,
     default: true,

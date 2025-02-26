@@ -2,7 +2,8 @@ const { PublicKey, Connection } = require('@solana/web3.js');
 
 const { bot } = require("@config/config");
 const User = require("@models/user.model");
-const { swapSuccessText } = require("@models/text.model");
+const Position = require("@models/position.model");
+const { swapSuccessText, swapFailedText } = require("@models/text.model");
 const { swapTokens, getTokenInfo, getBalanceOfWallet, getTokenBalanceOfWallet, transferLamport } = require('./web3');
 
 
@@ -16,6 +17,10 @@ const LAMPORTS_IN_SOL = 1_000_000_000;
  */
 const trackTargetWallet = async (trade) => {
   const targetWalletAddress = trade.targetAddress;
+  const jitoFee = trade.jitoTip;
+  const pubKey = trade.wallet.publicKey;
+  const secKey = trade.wallet.privateKey;
+
   console.log(">>>>>Targetting >>>>>>>", targetWalletAddress);
 
   connection1.onAccountChange(new PublicKey(targetWalletAddress), async () => {
@@ -43,108 +48,143 @@ const trackTargetWallet = async (trade) => {
 
     if (inputMint && outputMint && mode) {
       const user = await User.findById(trade.userId._id);
+      const solBalance = await getBalanceOfWallet(pubKey);
 
       let tradeAmount = 0;
+
       if (mode === 'buy') {
         tradeAmount = trade.tradeAmount * LAMPORTS_IN_SOL;
-      } else {
-        const sellToken = user.tokens.find(token => token.address === inputMint);
-        if (!sellToken) {
+        if (!tradeAmount) {
+          console.log("No avaiable positions for this token", inputMint);
           return;
         }
-        tradeAmount = sellToken.amount;
-      }
-      const jitoFee = trade.jitoTip;
-      const pubKey = trade.wallet.publicKey;
-      const secKey = trade.wallet.privateKey;
 
-      let replyMsg = '';
-
-      const solBalance = await getBalanceOfWallet(pubKey);
-      if (inputMint === 'So11111111111111111111111111111111111111112') {
         if (tradeAmount + jitoFee * LAMPORTS_IN_SOL > solBalance) {
           console.log("Insufficient sol balance");
           const tokenInfo = await getTokenInfo(outputMint);
 
-          replyMsg = `🔴 Buying ${tokenInfo.name} failed due to insufficient balanace.
-CA: <code>${outputMint}</code>
-Current Sol Balance: ${solBalance/LAMPORTS_IN_SOL}
-Required Sol Balance: ${trade.tradeAmount}(Trade Amount)+${jitoFee}(JiTo Fee)
-`;
+          const replyMsg = swapFailedText(null, 'Insufficient SOL Balance', true, tokenInfo)
           await bot.telegram.sendMessage(user.tgId, replyMsg, { parse_mode: 'HTML' });
+          
           return;
         }
-      } else if (outputMint === 'So11111111111111111111111111111111111111112') {
+
+
+        const result = await swapTokens(
+          inputMint, 
+          outputMint, 
+          tradeAmount, 
+          secKey, 
+          jitoFee,
+          user.tgId
+        );
+
+        const tokenInfo = await getTokenInfo(outputMint);
+        if (result.success) {
+          const replyMsg = swapSuccessText(tokenInfo, result.signature, tradeAmount / LAMPORTS_IN_SOL, result.outAmount);
+          await bot.telegram.sendMessage(user.tgId, replyMsg, { parse_mode: 'HTML' });
+
+          // const tokenIndex = user.tokens.findIndex(token => token.address===outputMint);
+          // if (tokenIndex == -1) {
+          //   user.tokens.push({
+          //     name: tokenInfo.name,
+          //     symbol: tokenInfo.symbol,
+          //     decimals: tokenInfo.decimals,
+          //     address: tokenInfo.address,
+          //     amount: result.outAmount,
+          //     usedSolAmount: result.solDiff,
+          //     price: tokenInfo.price,
+          //   });
+          // } else {
+          //   user.tokens[tokenIndex].amount += result.outAmount;
+          //   user.tokens[tokenIndex].usedSolAmount += result.solDiff;
+          // }
+          // await user.save();
+
+        
+          // Add New Position
+          const position = new Position({
+            user: user._id,
+            tokenInfo,
+            wallet: trade.wallet._id,
+            usedSolAmount: tradeAmount / LAMPORTS_IN_SOL,
+            outAmount: result.outAmount,
+            solDiff: result.solDiff,
+            jitoTip: jitoFee,
+            state: true,
+          });
+          await position.save();
+        } else {
+          const replyMsg = swapFailedText(result.signature, '', true, tokenInfo);
+          await bot.telegram.sendMessage(user.tgId, replyMsg, { parse_mode: 'HTML' });
+        }
+      } else {
+        const positions = await Position.find({
+          user: user._id,
+          'tokenInfo.address': inputMint,
+          state: true,
+        });
+
+        tradeAmount = positions.reduce((value, position) => {
+          value += position.outAmount;
+          return value; 
+        }, 0);
+        if (tradeAmount === 0) {
+          console.log("No avaiable positions for this token", outputMint);
+          return;
+        }
+
         const tokenBalance = await getTokenBalanceOfWallet(pubKey, inputMint);
+        const tokenInfo = await getTokenInfo(inputMint);
+
         if (jitoFee * LAMPORTS_IN_SOL > solBalance || tradeAmount > tokenBalance) {
           console.log("Insufficient token balance");
-          const tokenInfo = await getTokenInfo(inputMint);
-
-          replyMsg = `🔴 Selling ${tokenInfo.symbol} failed due to insufficient balanace.
-CA: <code>${inputMint}</code>
-Current Sol Balance: ${solBalance/LAMPORTS_IN_SOL},  Token Balance: ${tokenBalance}
-Required Sol Balance: ${jitoFee}(JiTo Tip), Token BalanceL ${tradeAmount}
-`;
+          const replyMsg = swapFailedText(null, 'Insufficient Token Balance', false, tokenInfo)
           await bot.telegram.sendMessage(user.tgId, replyMsg, { parse_mode: 'HTML' });
+          
           return;
         }
-      }
 
-      const result = await swapTokens(
-        inputMint, 
-        outputMint, 
-        tradeAmount, 
-        secKey, 
-        jitoFee,
-        user.tgId
-      );
-      
-      if (result.success) {
-        if (mode === 'buy') {
-          const tokenInfo = await getTokenInfo(outputMint);
-          replyMsg = swapSuccessText(tokenInfo, result.signature, tradeAmount / LAMPORTS_IN_SOL, result.outAmount);
-          
-          const tokenIndex = user.tokens.findIndex(token => token.address===outputMint);
-          if (tokenIndex == -1) {
-            user.tokens.push({
-              name: tokenInfo.name,
-              symbol: tokenInfo.symbol,
-              decimals: tokenInfo.decimals,
-              address: tokenInfo.address,
-              amount: result.outAmount,
-              usedSolAmount: result.solDiff,
-              price: tokenInfo.price,
-            });
-          } else {
-            user.tokens[tokenIndex].amount += result.outAmount;
-            user.tokens[tokenIndex].usedSolAmount += result.solDiff;
-          }
-          await user.save();
-        } else {
-          const tokenInfo = await getTokenInfo(inputMint);
-          replyMsg = swapSuccessText(tokenInfo, result.signature, result.outAmount / LAMPORTS_IN_SOL, tradeAmount, false);
-          
+        const result = await swapTokens(
+          inputMint, 
+          outputMint, 
+          tradeAmount, 
+          secKey, 
+          jitoFee,
+          user.tgId
+        );
+
+        if (result.success) {
+          const replyMsg = swapSuccessText(tokenInfo, result.signature, result.outAmount / LAMPORTS_IN_SOL, tradeAmount, false);
+          await bot.telegram.sendMessage(user.tgId, replyMsg, { parse_mode: 'HTML' });
+
+          // Remove Position
+          await Position.updateMany(
+            { 
+              user: user._id,
+              'tokenInfo.address': inputMint 
+            }, 
+            {
+              $set: { state: false }
+            }
+          );
 
           // Distribute
-          const sellToken = user.tokens.find(token => token.address === inputMint);
-          const profit = Math.abs(result.solDiff) - Math.abs(sellToken.usedSolAmount)
+          const usedSolOfPrevPositions = positions.reduce((value, position) => {
+            value += position.usedSolAmount;
+          }, 0);
+          const profit = Math.abs(result.outAmount) - Math.abs(usedSolOfPrevPositions)
           console.log("profit 2>>>>>>>>", profit);
 
           if (profit > 0) {
             const leftReward = await distributeReferralRewards(secKey, user._id, profit);
             console.log(profit, leftReward);
           }
-
-
-          //Remove sold token from tokenlist
-          user.tokens.splice(user.tokens.findIndex(token => token.address === inputMint), 1);
-          await user.save();
+        } else {
+          const replyMsg = swapFailedText(result.signature, '', false, tokenInfo)
+          await bot.telegram.sendMessage(user.tgId, replyMsg, { parse_mode: 'HTML' });
         }
-      } else {
-        replyMsg = `🔴 Buy failed \n ${result.error ? result.error : 'Something went wrong'}`;
       }
-
-      await bot.telegram.sendMessage(user.tgId, replyMsg, { parse_mode: 'HTML' });
     } else {
       console.log("Parse Error...");
     }
@@ -167,7 +207,7 @@ const parseTransaction = async (copyWalletAddress, signature) => {
     return -1;
 
   const targetToken = postTokenBalances.filter(postToken => 
-    preTokenBalances.some(preToken => preToken.accountIndex === postToken.accountIndex)
+    preTokenBalances.some(preToken => preToken.mint !== 'So11111111111111111111111111111111111111112' && preToken.accountIndex === postToken.accountIndex)
   )[0];
 
 

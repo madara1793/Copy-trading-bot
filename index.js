@@ -274,6 +274,10 @@ bot.on("text", async (ctx) => {
         await positionActions.setPositionSlippage(ctx);
         break;
       }
+      case 'enterSellPositionAmount': {
+        await positionActions.sellPosition(ctx, ctx.session.sellPositionId, parseFloat(ctx.message.text))
+        break;
+      }
       default:
         break;
     }
@@ -392,7 +396,7 @@ bot.action('Switch to Sell', positionActions.switchToSellPositionAction);
 bot.action('Switch to Buy', positionActions.switchToBuyPositionAction);
 bot.action(/Buy_(\d+)/, positionActions.buyPosition);
 bot.action(/Position_[A-Za-z0-9]+$/, positionActions.getPositionAction);
-bot.action(/Sell_(\d+)_[A-Za-z0-9]+$/, positionActions.sellPosition);
+bot.action(/Sell_(\d+)_[A-Za-z0-9]+$/, positionActions.sellPositionMsg);
 // bot.action('Set Position Buy Tip', positionActions.setPositionBuyTipMsgAction);
 // bot.action('Set Position Slippage', positionActions.setPositionSlippageMsgAction);
 
