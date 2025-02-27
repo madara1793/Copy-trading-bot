@@ -65,7 +65,8 @@ bot.command("setting", settingCommand);
 bot.command("wallets", walletAction);
 
 bot.command("positions", positionActions.positionActions);
-bot.command("withdraw", withdrawActions.withdrawAction)
+bot.command("withdraw", withdrawActions.withdrawAction);
+bot.command("copytrade", tradeActions.tradeAction)
 
 
 bot.on("text", async (ctx) => {
@@ -254,6 +255,15 @@ bot.on("text", async (ctx) => {
         }
         break;
       }
+      case 'setTradeTargetAddress': {
+        const res = await tradeActions.setTargetAddress(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid address. Please enter a valid address.');
+        }
+        break;
+      }
       case 'SetWithdrawal': {
         await withdrawActions.setWithdrawalAddress(ctx);
         break;
@@ -339,6 +349,7 @@ bot.action('Start Copy Trade', tradeActions.tradeAction)
 
 /******* Trade Settings Actions *******/
 
+bot.action('Set Target Address', tradeActions.setTargetMsgAction)
 bot.action('Set Min Token Holder', tradeActions.minTokenHolderMsgAction);
 bot.action('Set Min Volume', tradeActions.minTokenVolumeMsgAction);
 bot.action('Set Min MCap', tradeActions.minMCapMsgAction)

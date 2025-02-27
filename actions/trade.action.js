@@ -9,7 +9,8 @@ const { tradeMainText } = require('@models/texts/trade.text');
 const { copyTradeMarkup, tradeSettingMarkup } = require('@models/markups/trade.markup');
 const tradeTexts = require('@models/texts/trade.text');
 const { trackTargetWallet } = require('@utils/trade');
-const { getBalanceOfWallet } = require('@utils/web3')
+const { getBalanceOfWallet } = require('@utils/web3');
+const { connection } = require('@config/config');
 
 /**
  * The function to handle 'Return' action
@@ -226,6 +227,14 @@ const setTradeName = async (tradeId, tradeName) => {
 /**
  * @param {Context} ctx
  */
+const setTargetMsgAction = async (ctx) => {
+  ctx.session.state = 'setTradeTargetAddress';
+  await ctx.reply('Please enter your desired target address:');
+}
+
+/**
+ * @param {Context} ctx
+ */
 const minTokenHolderMsgAction = async (ctx) => {
   ctx.session.state = 'enterMinTokenHolder';
   await ctx.reply(tradeTexts.minTokenHolderMsg);
@@ -286,6 +295,35 @@ const tradePriorityFeeMsgAction = async (ctx) => {
   await ctx.reply(tradeTexts.tradePriorityFeeMsg);
 }
 
+const setTargetAddress = async (tradeId, targetAddress) => {
+  try {
+    const trade = await Trade.findById(tradeId).populate('wallet').populate('userId');;
+    if (!trade) {
+      throw new Error('Trade not found!');
+    }
+
+    if (trade.subscriptionId) {
+      connection.removeAccountChangeListener(trade.subscriptionId)
+    }
+    
+    console.log({
+      ...trade,
+      targetAddress,
+    });
+    trackTargetWallet({
+      ...trade.toObject(),
+      targetAddress,
+    });
+    
+    trade.targetAddress = targetAddress;
+    await trade.save();
+
+    return true;
+  } catch (error) {
+    console.log("Error while setMinTokenHolder:", error);
+    return false;
+  }
+}
 
 
 const setMinTokenHolder = async (tradeId, minTokenHolder) => {
@@ -697,9 +735,11 @@ module.exports = {
   tradeSlippageMsgAction,
   tradeJitoFeeMsgAction,
   tradePriorityFeeMsgAction,
+  setTargetMsgAction,
   addNewTrade,
   setTradeTarget,
   setTradeName,
+  setTargetAddress,
   setMinTokenHolder,
   setMinVolume,
   setMinTokenAge,

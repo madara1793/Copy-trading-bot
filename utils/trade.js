@@ -1,13 +1,13 @@
 const { PublicKey, Connection } = require('@solana/web3.js');
 
-const { bot } = require("@config/config");
+const { bot, connection } = require("@config/config");
 const User = require("@models/user.model");
 const Position = require("@models/position.model");
+const Trade = require("@models/trade.model");
 const { swapSuccessText, swapFailedText } = require("@models/text.model");
 const { swapTokens, getTokenInfo, getBalanceOfWallet, getTokenBalanceOfWallet, transferLamport } = require('./web3');
 
 
-const connection1 = new Connection(process.env.HTTP_URL || "",  {commitment: "confirmed"});
 const LAMPORTS_IN_SOL = 1_000_000_000;
 
 
@@ -23,7 +23,7 @@ const trackTargetWallet = async (trade) => {
 
   console.log(">>>>>Targetting >>>>>>>", targetWalletAddress);
 
-  connection1.onAccountChange(new PublicKey(targetWalletAddress), async () => {
+  const subscriptionId = connection.onAccountChange(new PublicKey(targetWalletAddress), async () => {
     console.log("Detected>>>>>>", targetWalletAddress);
 
     if (!trade.status) {
@@ -31,7 +31,7 @@ const trackTargetWallet = async (trade) => {
       return;
     }
 
-    const signatures = await connection1.getSignaturesForAddress(new PublicKey(targetWalletAddress));
+    const signatures = await connection.getSignaturesForAddress(new PublicKey(targetWalletAddress));
     let parseRes = await parseTransaction(targetWalletAddress, signatures[0]);
     if (parseRes === -1) {
       parseRes = await parseTransaction(targetWalletAddress, signatures[2]);
@@ -189,10 +189,14 @@ const trackTargetWallet = async (trade) => {
       console.log("Parse Error...");
     }
   });
+
+  const curTrade = await Trade.findById(trade._id);
+  curTrade.subscriptionId = subscriptionId;
+  await curTrade.save();
 }
 
 const parseTransaction = async (copyWalletAddress, signature) => {
-  const transaction = await connection1.getTransaction(signature.signature, {
+  const transaction = await connection.getTransaction(signature.signature, {
     maxSupportedTransactionVersion: 0
   });
 
@@ -334,7 +338,7 @@ const getDeltaAmount = (signer, preData, postData) => {
 //   const tokenATA = getAssociatedTokenAddressSync(mint, WALLET.publicKey);
 //   const solATA = getAssociatedTokenAddressSync(SOL_ADDRESS, WALLET.publicKey);
 //   const tokenBalance = BigInt(tokenAmount);
-//   const poolKeys = await getLiquidityV4PoolKeys(connection1, pool);
+//   const poolKeys = await getLiquidityV4PoolKeys(connection, pool);
 //   if (poolKeys && tokenBalance > BigInt(0)) {
 //     const swapInst = await getSwapTokenGivenInInstructions(
 //       WALLET.publicKey,

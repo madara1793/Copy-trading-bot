@@ -11,6 +11,7 @@ const WSS_URL = process.env.WSS_URL || '';
 
 const connection = new Connection(HTTP_URL, {
   wsEndpoint: WSS_URL,
+  commitment: "confirmed",
 });
 
 /*************************  Connect DB  *************************/

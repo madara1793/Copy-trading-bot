@@ -38,7 +38,7 @@ const tradeSettingMarkup = (trade) => {
       Markup.button.callback(`Config Name: ${trade.name}`, 'Set Trade Name'),
     ],
     [
-      Markup.button.callback(`🔑 Target Address: ${trade.targetAddress}`, 'Target Address'),
+      Markup.button.callback(`🔑 Target Address: ${trade.targetAddress}`, 'Set Target Address'),
     ],
     [
       Markup.button.callback(`🔎 Min Token Holder: ${trade.minTriggerTokenHolders || 'N/A'}`, 'Set Min Token Holder'),
