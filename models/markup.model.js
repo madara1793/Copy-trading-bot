@@ -22,7 +22,7 @@ const startMarkUp = (parseMode) => {
           Markup.button.callback('👥 Referrals', 'Invite friends')
         ],
         [
-          Markup.button.callback('🛠️ Setting', 'Setting'), 
+          Markup.button.callback('🛠️ Settings', 'Setting'), 
           Markup.button.callback('❓Help', 'Help')
         ],
       ]).reply_markup,

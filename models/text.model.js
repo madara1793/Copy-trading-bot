@@ -25,22 +25,10 @@ Get started below👇!
  * The text when start command is inputed
  */
 const settingText =  `
-  🛠️ Copy Trading Bot Settings
+🛠️ Mimic Settings
 
-Welcome to the settings page for your Solana Trading Bot!
+🔧 Select a setting you wish to change.
 
-1. Trade Amount: 
-  - Specify the amount of SOL you wish to trade (Default is 0.001 sol).
-2. Priority Fee: 
-  - Set the priority fee (in SOL) to ensure your transactions are processed quickly.
-3. Jito Fee:
-  - Set the Jito fee (in SOL) to  prioritize transaction inclusion in blocks using Jito’s MEV.
-4. Slippage BPS: 
-  - Define the slippage in basis points (bps).
-
-🔧 Please adjust these settings according to your trading strategy and preferences.
-
-                                                            The Unique Solana Trading Bot.
 `;
 
 /**
@@ -101,7 +89,7 @@ const tradeStartText = (trades) => {
 
 🌐 Utilize blazing fast copy trading speeds
 
-${trades.map(trade => `${trade.status ? '🟢':'🔴'} <code>${trade.targetAddress}</code>`)}
+${trades.map(trade => `${trade.status ? '🟢':'🔴'} <code>${trade.targetAddress}</code>`).join('\n')}
 
 Create a task below
   `;
