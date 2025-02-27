@@ -4,13 +4,14 @@ const User = require('@models/user.model');
 const Wallet = require('@models/wallet.model');
 const Trade = require('@models/trade.model');
 const { tradeStartText } = require('@models/text.model');
-const { tradeMarkUp } = require('@models/markup.model');
+const { tradeMarkUp, defaultWalletMarkup } = require('@models/markup.model');
 const { tradeMainText } = require('@models/texts/trade.text');
 const { copyTradeMarkup, tradeSettingMarkup } = require('@models/markups/trade.markup');
 const tradeTexts = require('@models/texts/trade.text');
 const { trackTargetWallet } = require('@utils/trade');
 const { getBalanceOfWallet } = require('@utils/web3');
 const { connection } = require('@config/config');
+const { isValidSolanaAddress } = require('@utils/functions');
 
 /**
  * The function to handle 'Return' action
@@ -194,6 +195,10 @@ const addNewTrade = async (ctx) => {
  */
 const setTradeTarget = async (tradeId, targetAddress) => {
   try {
+    if (!isValidSolanaAddress(targetAddress)) {
+      return false;
+    }
+
     const trade = await Trade.findById(tradeId);
     if (!trade) {
       throw new Error('Trade not found!');
@@ -223,6 +228,76 @@ const setTradeName = async (tradeId, tradeName) => {
     return false;
   }
 }
+
+/**
+ * @param {Context} ctx
+ */
+const changeTradeWallet = async (ctx) => {
+  try {
+    const index = parseInt(ctx.match[1]);
+    const tgId = ctx.chat.id;
+    const tradeId = ctx.session.tradeId;
+
+    const user = await User.findOne({ tgId });
+    if (!user) {
+      throw new Error('User not found!');
+    }
+
+    const trade = await Trade.findById(tradeId).populate('wallet', 'name');
+    if (!trade) {
+      throw new Error('Trade not found!');
+    }
+
+    if (user.wallets[index]) {
+      trade.wallet = user.wallets[index];
+      await trade.save();
+
+      const updatedTrade = await Trade.findById(trade._id).populate('wallet', 'name');
+      await ctx.reply(
+        tradeMainText(updatedTrade), 
+        {
+          parse_mode: "HTML",
+          reply_markup: tradeSettingMarkup(updatedTrade).reply_markup
+        }
+      );
+    } else {
+      await ctx.reply("Invalid wallet");
+    }
+  } catch (error) {
+    console.log("Error while setTradeName:", error);
+  }
+}
+
+/**
+ * @param {Context} ctx
+ */
+const setTradeWalletMsgAction = async (ctx) => {
+  try {
+    const tgId = ctx.chat.id;
+
+    const user = await User.findOne({ tgId }).populate('wallets');
+    if (!user) {
+      throw new Error('User not found!');
+    }
+
+    await ctx.reply(
+      'Please select the wallet number you want to operate on - Change Trade Wallet',
+      { parse_mode: 'Markdown', reply_markup: defaultWalletMarkup(user.wallets, 'trade').reply_markup}
+    );
+  } catch (error) {
+    console.error("Error while updating default wallet: ", error);
+  }
+}
+
+
+/**
+ * @param {Context} ctx
+ */
+const setTradeNameMsgAction = async (ctx) => {
+  ctx.session.state = 'enterTradeName';
+  await ctx.reply('Please choose a name for this config:');
+}
+
 
 /**
  * @param {Context} ctx
@@ -296,7 +371,12 @@ const tradePriorityFeeMsgAction = async (ctx) => {
 }
 
 const setTargetAddress = async (tradeId, targetAddress) => {
+  console.log(targetAddress)
   try {
+    if (!isValidSolanaAddress(targetAddress)) {
+      return false;
+    }
+    
     const trade = await Trade.findById(tradeId).populate('wallet').populate('userId');;
     if (!trade) {
       throw new Error('Trade not found!');
@@ -736,6 +816,9 @@ module.exports = {
   tradeJitoFeeMsgAction,
   tradePriorityFeeMsgAction,
   setTargetMsgAction,
+  setTradeNameMsgAction,
+  setTradeWalletMsgAction,
+  changeTradeWallet,
   addNewTrade,
   setTradeTarget,
   setTradeName,

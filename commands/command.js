@@ -53,7 +53,7 @@ const startCommand = async (ctx) => {
       const wallet = await generateWallet();
       const newWallet = new Wallet({
         userId: newUser._id,
-        name: generateWalletName(),
+        name: 'Wallet 1',
         publicKey: wallet.publicKey,
         privateKey: wallet.privateKey,
       });

@@ -83,25 +83,13 @@ bot.on("text", async (ctx) => {
     const tgId = ctx.chat.id;
     const user = await User.findOne({ tgId });
     const tradeId = ctx.session.tradeId;
+
+    console.log(botState, tradeId);
     
     if (!user) {
       throw new Error('User not found');
     }
     
-    if (botState === 'topTrader') {
-      const traderAddress = text;
-      const traderIndex = user.followingTraders.findIndex(trader => trader === traderAddress);
-      
-      if (traderIndex == -1) {
-        user.followingTraders.push(traderAddress);
-        await user.save();
-        ctx.reply(`✅ Added ${traderAddress} to your following traders`);
-
-      } else {
-        ctx.reply(`✅ Already registered ${traderAddress}`);
-      }
-      setTargetWallet(traderAddress);
-    }
     if (botState === 'walletName') {
       const walletId = ctx.session.walletId;
       const wallet = await Wallet.findById(walletId);
@@ -132,6 +120,11 @@ bot.on("text", async (ctx) => {
       case 'enterTargetAddress': {
         const tradeId = ctx.session.tradeId;
         const res = await setTradeTarget(tradeId, text);
+        if (!res) {
+          ctx.session.botState = 'enterTargetAddress';
+          ctx.reply('Invalid Address');
+          return;
+        }
 
         ctx.session.state = 'enterTradeName';
         await ctx.deleteMessage(ctx.message.message_id);
@@ -292,6 +285,8 @@ bot.on("text", async (ctx) => {
         break;
     }
 
+    // ctx.session.state = undefined;
+
   } catch (error) {
     console.error('Error while on text:', error);
   }
@@ -349,6 +344,9 @@ bot.action('Start Copy Trade', tradeActions.tradeAction)
 
 /******* Trade Settings Actions *******/
 
+bot.action(/change_tradeWallet_(\d+)/, tradeActions.changeTradeWallet);
+bot.action('Set Trade Wallet', tradeActions.setTradeWalletMsgAction);
+bot.action('Set Trade Name', tradeActions.setTradeNameMsgAction);
 bot.action('Set Target Address', tradeActions.setTargetMsgAction)
 bot.action('Set Min Token Holder', tradeActions.minTokenHolderMsgAction);
 bot.action('Set Min Volume', tradeActions.minTokenVolumeMsgAction);

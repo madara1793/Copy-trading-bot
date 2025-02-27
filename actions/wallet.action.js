@@ -24,7 +24,7 @@ const generateWalletAction = async (ctx) => {
 
     const newWallet = new Wallet({
       userId: user._id,
-      name: generateWalletName(),
+      name: `Wallet ${user.wallets.length + 1}`,
       publicKey: wallet.publicKey,
       privateKey: wallet.privateKey,
     });
@@ -89,7 +89,7 @@ const defaultWalletAction = async (ctx) => {
   try {
     const tgId = ctx.chat.id;
 
-    const user = await User.findOne({ tgId });
+    const user = await User.findOne({ tgId }).populate('wallets');
     if (!user) {
       throw new Error('User not found!');
     }
@@ -150,7 +150,7 @@ const walletNameAction = async (ctx) => {
   try {
     const tgId = ctx.chat.id;
 
-    const user = await User.findOne({ tgId });
+    const user = await User.findOne({ tgId }).populate('wallets');;
     if (!user) {
       throw new Error('User not found!');
     }
@@ -234,7 +234,7 @@ const importWallet = async (ctx) => {
 
     const newWallet = new Wallet({
       userId: user._id,
-      name: generateWalletName(),
+      name: `Wallet ${user.wallets.length + 1}`,
       publicKey: pubKey,
       privateKey: text,
     });
@@ -261,7 +261,7 @@ const unbindWalletMsgAction = async (ctx) => {
   try {
     const tgId = ctx.chat.id;
 
-    const user = await User.findOne({ tgId });
+    const user = await User.findOne({ tgId }).populate('wallets');;
     if (!user) {
       throw new Error('User not found!');
     }
@@ -313,7 +313,7 @@ const exportKeyMsgAction = async (ctx) => {
   try {
     const tgId = ctx.chat.id;
 
-    const user = await User.findOne({ tgId });
+    const user = await User.findOne({ tgId }).populate('wallets');;
     if (!user) {
       throw new Error('User not found!');
     }

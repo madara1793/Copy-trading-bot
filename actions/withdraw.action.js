@@ -59,7 +59,7 @@ const setWithdrawalMsgAction = async (ctx) => {
 const switchWithdrawWallet = async (ctx) => {
   const tgId = ctx.chat.id;
 
-  const user = await User.findOne({ tgId });
+  const user = await User.findOne({ tgId }).populate('wallets');;
   if (!user) {
     throw new Error('User not found!');
   }
