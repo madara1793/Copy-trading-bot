@@ -11,14 +11,43 @@ const fetch = require("cross-fetch");
 const getQuoteForSwap = async (inputAddr, outputAddr, amount, slippageBps = 50) => {
   try {
     const response = await fetch(
-      `https://quote-api.jup.ag/v6/quote?inputMint=${inputAddr}&outputMint=${outputAddr}&amount=${amount}&slippageBps=${slippageBps}`
+      `https://quote-api.jup.ag/v6/quote?inputMint=${inputAddr}&outputMint=${outputAddr}&amount=${amount}&slippageBps=${slippageBps}&platformFeeBps=100`
     );
     const quote = await response.json();
-    console.log('swapInfo:', quote);
+    
     return quote;
   } catch (error) {
     console.error('Error while getQuoteForSwap:', error);
     throw new Error('Error while getQuoteForSwap');
+  }
+}
+
+
+const getSwapInstruction = async (quote, publicKey) => {
+  try {
+    const response = await fetch(
+      'https://api.jup.ag/swap/v1/swap-instructions', {
+        method: 'post',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quoteResponse: quote,
+          userPublicKey: publicKey.toString(),
+        }),
+      }
+
+    
+    );
+
+    const instructions = await response.json();
+    if (instructions.error) {
+      throw new Error("Failed to get swap instructions: " + instructions.error);
+    }
+
+    return instructions;
+  } catch (error) {
+
   }
 }
 
@@ -29,7 +58,7 @@ const getQuoteForSwap = async (inputAddr, outputAddr, amount, slippageBps = 50) 
  * @param {string} publicKey
  * @returns
  */
-const getSerializedTransaction = async (quote, publicKey) => {
+const getSerializedTransaction = async (quote, publicKey, address) => {
   try {
     const response = await fetch('https://quote-api.jup.ag/v6/swap', {
       method: 'post',
@@ -40,6 +69,7 @@ const getSerializedTransaction = async (quote, publicKey) => {
         quoteResponse: quote,
         userPublicKey: publicKey,
         wrapAndUnwrapSol: true,
+        feeAccount: address,
       }),
     });
     const { swapTransaction } = await response.json();
@@ -71,4 +101,5 @@ module.exports = {
   getQuoteForSwap,
   getSerializedTransaction,
   getTokenPrice,
+  getSwapInstruction
 };

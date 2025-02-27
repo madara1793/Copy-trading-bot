@@ -20,6 +20,9 @@ const tradeSchema = new Schema({
     type: Boolean,
     default: false,
   },
+  subscriptionId: {
+    type: Number,
+  },
   tradeAmount: {
     type: Number,
     default: 0.001,

@@ -62,24 +62,14 @@ const sendBundle = async (bundledTranscations, keyPair, jitoFee) => {
   try {
     const blockchainEngineUrl = process.env.BLOCKCHAIN_ENGINE_URL;
     const searcher = searcherClient(blockchainEngineUrl, undefined);
+
     const bundle = new Bundle(bundledTranscations, bundledTranscations.length + 1);
-
-    const { blockhash } = await connection.getLatestBlockhash("finalized");
-    const _tipAccount = (await searcher.getTipAccounts()).value[0];
-    const tipAccount = new PublicKey(_tipAccount);
-
-    let maybeBundle = bundle.addTipTx(keyPair, jitoFee * 1e9, tipAccount, blockhash);
-    if (isError(maybeBundle)) {
-      throw maybeBundle;
-    }
-
-    const signatures = bundledTranscations.map(tx => {
-      return base58.default.encode(tx.signatures[0]);
-    })
-
-    const bundleId = await searcher.sendBundle(maybeBundle);
+    const bundleId = await searcher.sendBundle(bundle);
     console.log(`Bundle ${bundleId.value} sent.`);
-
+    
+    const signatures = bundledTranscations.map(tx => {
+      return base58.encode(tx.signatures[0]);
+    })
     const res = await onBundleResultFromConfirmTransaction(signatures);
     return {
       success: res,

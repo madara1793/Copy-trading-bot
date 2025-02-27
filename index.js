@@ -65,6 +65,8 @@ bot.command("setting", settingCommand);
 bot.command("wallets", walletAction);
 
 bot.command("positions", positionActions.positionActions);
+bot.command("withdraw", withdrawActions.withdrawAction);
+bot.command("copytrade", tradeActions.tradeAction)
 
 
 bot.on("text", async (ctx) => {
@@ -81,25 +83,13 @@ bot.on("text", async (ctx) => {
     const tgId = ctx.chat.id;
     const user = await User.findOne({ tgId });
     const tradeId = ctx.session.tradeId;
+
+    console.log(botState, tradeId);
     
     if (!user) {
       throw new Error('User not found');
     }
     
-    if (botState === 'topTrader') {
-      const traderAddress = text;
-      const traderIndex = user.followingTraders.findIndex(trader => trader === traderAddress);
-      
-      if (traderIndex == -1) {
-        user.followingTraders.push(traderAddress);
-        await user.save();
-        ctx.reply(`✅ Added ${traderAddress} to your following traders`);
-
-      } else {
-        ctx.reply(`✅ Already registered ${traderAddress}`);
-      }
-      setTargetWallet(traderAddress);
-    }
     if (botState === 'walletName') {
       const walletId = ctx.session.walletId;
       const wallet = await Wallet.findById(walletId);
@@ -130,6 +120,11 @@ bot.on("text", async (ctx) => {
       case 'enterTargetAddress': {
         const tradeId = ctx.session.tradeId;
         const res = await setTradeTarget(tradeId, text);
+        if (!res) {
+          ctx.session.botState = 'enterTargetAddress';
+          ctx.reply('Invalid Address');
+          return;
+        }
 
         ctx.session.state = 'enterTradeName';
         await ctx.deleteMessage(ctx.message.message_id);
@@ -253,6 +248,15 @@ bot.on("text", async (ctx) => {
         }
         break;
       }
+      case 'setTradeTargetAddress': {
+        const res = await tradeActions.setTargetAddress(tradeId, text);
+        if (res) {
+          setupTradeAction(ctx, tradeId);
+        } else {
+          ctx.reply('Invalid address. Please enter a valid address.');
+        }
+        break;
+      }
       case 'SetWithdrawal': {
         await withdrawActions.setWithdrawalAddress(ctx);
         break;
@@ -273,9 +277,15 @@ bot.on("text", async (ctx) => {
         await positionActions.setPositionSlippage(ctx);
         break;
       }
+      case 'enterSellPositionAmount': {
+        await positionActions.sellPosition(ctx, ctx.session.sellPositionId, parseFloat(ctx.message.text))
+        break;
+      }
       default:
         break;
     }
+
+    // ctx.session.state = undefined;
 
   } catch (error) {
     console.error('Error while on text:', error);
@@ -334,6 +344,10 @@ bot.action('Start Copy Trade', tradeActions.tradeAction)
 
 /******* Trade Settings Actions *******/
 
+bot.action(/change_tradeWallet_(\d+)/, tradeActions.changeTradeWallet);
+bot.action('Set Trade Wallet', tradeActions.setTradeWalletMsgAction);
+bot.action('Set Trade Name', tradeActions.setTradeNameMsgAction);
+bot.action('Set Target Address', tradeActions.setTargetMsgAction)
 bot.action('Set Min Token Holder', tradeActions.minTokenHolderMsgAction);
 bot.action('Set Min Volume', tradeActions.minTokenVolumeMsgAction);
 bot.action('Set Min MCap', tradeActions.minMCapMsgAction)
@@ -381,7 +395,8 @@ bot.action('Withdraw 50%', withdrawActions.withdraw50Action);
 bot.action('Withdraw 100%', withdrawActions.withdrawAllAction);
 bot.action('Withdraw X SOL', withdrawActions.withdrawXMsgAction);
 bot.action('Set Withdrawal Address', withdrawActions.setWithdrawalMsgAction);
-
+bot.action('Swtich Withraw Address', withdrawActions.switchWithdrawWallet)
+bot.action(/withdraw_wallet_[A-Za-z0-9]+$/, withdrawActions.switchWithdrawWalletAction);
 
 /******************************* Positions ****************************/
 bot.action('Position', positionActions.positionActions);
@@ -390,7 +405,7 @@ bot.action('Switch to Sell', positionActions.switchToSellPositionAction);
 bot.action('Switch to Buy', positionActions.switchToBuyPositionAction);
 bot.action(/Buy_(\d+)/, positionActions.buyPosition);
 bot.action(/Position_[A-Za-z0-9]+$/, positionActions.getPositionAction);
-bot.action(/Sell_(\d+)_[A-Za-z0-9]+$/, positionActions.sellPosition);
+bot.action(/Sell_(\d+)_[A-Za-z0-9]+$/, positionActions.sellPositionMsg);
 // bot.action('Set Position Buy Tip', positionActions.setPositionBuyTipMsgAction);
 // bot.action('Set Position Slippage', positionActions.setPositionSlippageMsgAction);
 

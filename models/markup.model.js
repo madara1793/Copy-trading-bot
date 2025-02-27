@@ -45,11 +45,6 @@ const settingMarkUp = (user) => {
         Markup.button.callback(`${user.enableAutoTrade?'🟢':'🔴'} Auto Trading (Auto Buy/Sell)`, "Auto Trading"),
         Markup.button.callback(`${user.enableAutoTrade?'🔴':'🟢'} Manual Trading`, 'Manual Trading'),
       ],
-
-      [
-        Markup.button.callback(`💵 Target Trade Min Amount`, 'TargetMinTradeAmount'),
-        Markup.button.callback(`💵 Target Trade Max Amount`, 'TargetMaxTradeAmount'),
-      ],
       [
         Markup.button.callback(`💵 Priority Fee`, 'Priority Fee'),
         Markup.button.callback(`💵 Jito Tip`, 'Jito Tip'),
@@ -116,12 +111,17 @@ const defaultWalletMarkup = (wallets, type) => {
     case 'export':
       buttonQuery = 'export_wallet_';
       break;
+    case 'withdraw':
+      buttonQuery = 'withdraw_wallet_';
+      break;
+    case 'trade':
+      buttonQuery = 'change_tradeWallet_'
     default:
       break;
   }
   
   const buttons = wallets.map((wallet, index) =>
-    Markup.button.callback(index, `${buttonQuery}${index}`)
+    Markup.button.callback(`${wallet.name}`, `${buttonQuery}${index}`)
   );
 
   // Group buttons into rows of 4

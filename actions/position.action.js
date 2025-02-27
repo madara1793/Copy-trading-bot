@@ -54,12 +54,11 @@ const createPositionMsgAction = async (ctx) => {
 const createPositionAction = async (ctx) => {
   try {
     const tgId = ctx.chat.id;
-    const user  = await User.findOne({ tgId });
-    const wallets = await Wallet.find({ userId: user._id });
+    const user  = await User.findOne({ tgId }).populate('defaultWallet');
 
     const walletText = 
       await Promise.all(
-        wallets.map(async (wallet, index) => {
+        [user.defaultWallet].map(async (wallet, index) => {
           const balance = await getBalanceOfWallet(wallet.publicKey);
           return `💳 W${index + 1}: ${balance / 1e9} SOL\n`
         })
@@ -185,6 +184,7 @@ const buyPosition = async (ctx) => {
       amount * 1e9,
       user.defaultWallet.privateKey,
       user.jitoFee,
+      tgId,
     );
     
     if (result.error) {
@@ -204,6 +204,7 @@ const buyPosition = async (ctx) => {
         usedSolAmount: amount,
         outAmount: result.outAmount,
         solDiff: result.solDiff,
+        jitoTip: user.jitoFee,
         state: true,
       });
       await position.save();
@@ -213,42 +214,60 @@ const buyPosition = async (ctx) => {
   }
 }
 
+/**
+ * @param {Context} ctx
+ */
+const sellPositionMsg = async (ctx) => {
+  const sellQuantities = [1, 5, 10, 50, 100];
+
+  const queryData = ctx.update.callback_query.data;
+  const index = parseInt(queryData.split("_")[1]);
+  const positionId = queryData.split("_")[2];
+
+  if (isNaN(index)) {
+    ctx.session.state = 'enterSellPositionAmount';
+    ctx.session.sellPositionId = positionId;
+
+    await ctx.reply('Enter your desired amount to sell:');
+    return;
+  }
+
+  const position = await Position.findById(positionId).populate('wallet');
+  if (!position) {
+    throw new Error("Position not found!");
+  }
+
+  const percent = sellQuantities[index];
+  const sellAmount = percent / 100 * position.outAmount;
+
+
+  await sellPosition(ctx, positionId, sellAmount);
+}
+
+
 
 /**
  * @param {Context} ctx
  */
-const sellPosition = async (ctx) => {
-  const sellQuantities = [1, 5, 10, 50, 100];
-
+const sellPosition = async (ctx, positionId, sellAmount) => {
   try {
     const tgId = ctx.chat.id;
-    const user = await User.findOne({ tgId }).populate('defaultWallet');
-    if (!user) {
-      throw new Error('User not found!');
-    }
 
-    const queryData = ctx.update.callback_query.data;
-    if (queryData.split("_")[1] === 'X') {
-      ctx.session.state = 'enterSellPositionAmount';
-      await ctx.reply('Enter your desired amount to sell:');
-      return;
-    }
-
-    const index = parseInt(queryData.split("_")[1]);
-    const percent = sellQuantities[index];
-    const positionId = queryData.split("_")[2];
-
-    const position = await Position.findById(positionId);
+    const position = await Position.findById(positionId).populate('wallet');
     if (!position) {
       throw new Error("Position not found!");
+    }
+    if (position.outAmount < sellAmount) {
+      return;
     }
     
     const result = await swapTokens(
       position.tokenInfo.address,
       'So11111111111111111111111111111111111111112',
-      percent / 100 * position.outAmount,
-      user.defaultWallet.privateKey,
-      user.jitoFee,
+      sellAmount,
+      position.wallet.privateKey,
+      position.jitoTip,
+      tgId
     );
     
     if (result.error) {
@@ -260,15 +279,15 @@ const sellPosition = async (ctx) => {
         position.tokenInfo, 
         result.signature,  
         result.outAmount / 1e9, 
-        percent / 100 * position.outAmount, 
+        sellAmount, 
         false
       );
       await ctx.reply(replyMsg, { parse_mode:  "HTML" });
-      
-      position.outAmount = (100 - percent) * position.outAmount;
-      if (percent === 100) {
+
+      if (position.outAmount === sellAmount) {
         position.state = false;
       }
+      position.outAmount -= sellAmount;
       await position.save();
     }
   } catch (error) {
@@ -345,6 +364,7 @@ module.exports = {
   switchToSellPositionAction,
   switchToBuyPositionAction,
   buyPosition,
+  sellPositionMsg,
   sellPosition,
   getPositionAction,
 }

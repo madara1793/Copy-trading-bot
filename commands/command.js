@@ -53,7 +53,7 @@ const startCommand = async (ctx) => {
       const wallet = await generateWallet();
       const newWallet = new Wallet({
         userId: newUser._id,
-        name: generateWalletName(),
+        name: 'Wallet 1',
         publicKey: wallet.publicKey,
         privateKey: wallet.privateKey,
       });
@@ -138,7 +138,9 @@ const setCommands = async () => {
     const commands = [
       { command: '/start', description: 'Start the bot' },
       { command: '/wallets', description: 'Wallets' },
+      { command: '/copytrade', description: 'Copy Trade' },
       { command: '/positions', description: 'Positions' },
+      { command: '/withdraw', description: 'Withdraw Sol' },
       { command: '/setting', description: 'Setting' },
       { command: '/help', description: 'Help' },
     ];

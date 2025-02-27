@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-
+const { PublicKey } = require('@solana/web3.js');
 /**
  * Convert Uint8Array type hexadecimal string type.
  *
@@ -26,9 +26,18 @@ const generateWalletName = () => {
   return 'wallet-' + uuidv4().split('-')[0];
 };
 
+const isValidSolanaAddress = (address) => {
+  try {
+    const pubkey = new PublicKey(address);
+    return PublicKey.isOnCurve(pubkey.toBuffer());
+  } catch (error) {
+    return false;
+  }
+}
 
 
 module.exports = {
   uint8ArrayToHex,
   generateWalletName,
+  isValidSolanaAddress
 };

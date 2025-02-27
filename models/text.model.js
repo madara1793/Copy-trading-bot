@@ -122,6 +122,10 @@ const followingTraderText = (user) => {
   }).join('\n');
 }
 
+const invalidWalletAddressMsg = () => `
+  Invalid wallet address. Please check again.
+`;
+
 /**
  * The text when help command is inputed
  */
@@ -145,19 +149,37 @@ How it works:
 Join the trading revolution today! 🌟
 `;
 
-const swapSuccessText = (tokenInfo, signature, solAmount, tokenAmount, isBuy=true) => {
-  return `🟢 <b>${isBuy?'Buying': 'Selling'} <b>${tokenInfo.symbol || tokenInfo.name}</b> is success</b>.
-You ${isBuy?'bought':'sold'} ${tokenAmount / 10 ** tokenInfo.decimals} <b>${
-    tokenInfo.symbol || tokenInfo.name
-  }</b> using <b>${solAmount}</b> SOL.
-📝<a href='https://solscan.io/tx/${signature}'>Transaction</a>`;
+const pendingTxText = (signature) => {
+  return `
+🕔 Transaction Sent
+  `;
 };
 
-const swapFailedText = (signature, errorMsg) => {
+
+const swapSuccessText = (tokenInfo, signature, solAmount, tokenAmount, isBuy=true) => {
+  return ` 
+🟢  Transaction Success
+
+${isBuy?'Buy': 'Sell'} | Name: ${tokenInfo.symbol || tokenInfo.name} | Price: ${tokenInfo.price}USD
+CA: <code>${tokenInfo.address}</code>
+
+You ${isBuy?'bought':'sold'} ${tokenAmount / 10 ** tokenInfo.decimals} <b>${tokenInfo.symbol || tokenInfo.name}</b> in  <b>${solAmount}</b> SOL.
+
+📝 <a href='https://solscan.io/tx/${signature}'>Tx</a>
+`};
+
+const swapFailedText = (signature, errorMsg, isBuy = true, tokenInfo = null) => {
   return `
 ⛔ Transaction failed
+
+${tokenInfo && `
+${isBuy ? 'Buy':'Sell'} | Name: ${tokenInfo.name} | Price: ${tokenInfo.price}USD
+CA: <code>${tokenInfo.address}</code>
+`}
+
 ${errorMsg}
-📝<a href='https://solscan.io/tx/${signature}'>Transaction</a>
+${signature && `📝 <a href='https://solscan.io/tx/${signature}'>Tx</a>`}
+
 `;
 }
 
@@ -172,7 +194,9 @@ module.exports = {
   exportWalletKeyText,
   tradeStartText, 
   followingTraderText,
-  startText, 
+  startText,
+  pendingTxText,
   swapSuccessText,
   swapFailedText,
+  invalidWalletAddressMsg,
 };
