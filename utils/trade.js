@@ -176,12 +176,12 @@ const trackTargetWallet = async (trade) => {
 
           // Distribute
           const usedSolOfPrevPositions = positions.reduce((value, position) => {
-            value += position.solDiff;
+            value += position.usedSolAmount;
             return value;
           }, 0);
 
           console.log(result.solDiff, usedSolOfPrevPositions);
-          const profit = Math.abs(result.solDiff) - usedSolOfPrevPositions
+          const profit = Math.abs(result.outAmount) - usedSolOfPrevPositions
           console.log("profit 2>>>>>>>>", profit);
 
           if (profit > 0) {

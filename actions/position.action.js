@@ -1,4 +1,5 @@
 const { Context } = require("telegraf");
+const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
 
 const Wallet = require('@models/wallet.model');
 const User = require('@models/user.model');
@@ -237,7 +238,7 @@ const sellPositionMsg = async (ctx) => {
   }
 
   const percent = sellQuantities[index];
-  const sellAmount = percent / 100 * position.outAmount;
+  const sellAmount = percent / 100 * position.outAmount / (10 ** position.tokenInfo.decimals);
 
 
   await sellPosition(ctx, positionId, sellAmount);
@@ -259,11 +260,13 @@ const sellPosition = async (ctx, positionId, sellAmount) => {
     if (position.outAmount < sellAmount) {
       return;
     }
+
+    console.log(position, sellAmount)
     
     const result = await swapTokens(
       position.tokenInfo.address,
       'So11111111111111111111111111111111111111112',
-      sellAmount,
+      sellAmount * (10 ** position.tokenInfo.decimals),
       position.wallet.privateKey,
       position.jitoTip,
       tgId
