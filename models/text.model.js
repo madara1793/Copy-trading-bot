@@ -27,7 +27,7 @@ Get started below👇!
 const settingText =  `
 🛠️ Mimic Settings
 
-🔧 Select a setting you wish to change.
+🔧 <i>Select a setting you wish to change</i>.
 
 `;
 

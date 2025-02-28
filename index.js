@@ -21,6 +21,7 @@ const {
   slippageMsgAction,
   setSlippage,
 } = require("@actions/setting.action");
+const settingActions = require("@actions/setting.action");
 const { 
   generateWalletAction, 
   walletAction, 
@@ -60,7 +61,7 @@ bot.command("start", startCommand);
 
 bot.command("help", helpCommand);
 
-bot.command("setting", settingCommand);
+bot.command("settings", settingCommand);
 
 bot.command("wallets", walletAction);
 
@@ -105,17 +106,26 @@ bot.on("text", async (ctx) => {
 
     
     switch (botState) {
-      case 'priorityFee': 
-        await setPriorityFee(ctx);
+      case 'priorityFee_buy': 
+        await setPriorityFee(ctx, true);
         break;
-      case 'jitoTip':
-        await setJitoTip(ctx);
+      case 'priorityFee_sell': 
+        await setPriorityFee(ctx, false);
+        break;
+      case 'jitoTip_buy':
+        await setJitoTip(ctx, true);
+        break;
+      case 'jitoTip_sell':
+        await setJitoTip(ctx, false);
         break;
       case 'tradeAmount':
         await setTradeAmount(ctx);
         break;
-      case 'slippage':
-        await setSlippage(ctx);
+      case 'slippage_buy':
+        await setSlippage(ctx, true);
+        break;
+      case 'slippage_sell':
+        await setSlippage(ctx, false);
         break;
       case 'enterTargetAddress': {
         const tradeId = ctx.session.tradeId;
@@ -326,13 +336,14 @@ bot.action(/export_wallet_(\d+)/, exportKey);
 
 /** Setting Actions */
 
-bot.action('Priority Fee', priorityFeeMsgAction);
-
-bot.action('Jito Tip', jitoTipMsgAction);
-
+bot.action('BUY_PriorityFeeSetting', priorityFeeMsgAction);
+bot.action('SELL_PriorityFeeSetting', priorityFeeMsgAction);
+bot.action('BUY_JitoTipSetting', jitoTipMsgAction);
+bot.action('SELL_JitoTipSetting', jitoTipMsgAction);
 bot.action('Trade Amount', tradeAmountMsgAction);
-
-bot.action('Slippage BPS', slippageMsgAction);
+bot.action('BUY_SlippageSetting', slippageMsgAction);
+bot.action('SELL_SlippageSetting', slippageMsgAction);
+bot.action('Return To Setting', settingActions.settingAction)
 
 
 /***************** Trade Actions ******************/
@@ -406,8 +417,15 @@ bot.action('Switch to Buy', positionActions.switchToBuyPositionAction);
 bot.action(/Buy_(\d+)/, positionActions.buyPosition);
 bot.action(/Position_[A-Za-z0-9]+$/, positionActions.getPositionAction);
 bot.action(/Sell_(\d+)_[A-Za-z0-9]+$/, positionActions.sellPositionMsg);
+bot.action(/Sell_(\X+)_[A-Za-z0-9]+$/, positionActions.sellPositionMsg);
+
 // bot.action('Set Position Buy Tip', positionActions.setPositionBuyTipMsgAction);
 // bot.action('Set Position Slippage', positionActions.setPositionSlippageMsgAction);
+
+/****************************** Settings *************************** */
+bot.action('Manual Buy Setting', settingActions.manualBuySettingAction);
+bot.action('Manual Sell Setting', settingActions.manualSellSettingAction);
+
 
 setCommands(bot);
 

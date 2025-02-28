@@ -71,8 +71,8 @@ const createPositionAction = async (ctx) => {
     tokenInfo.mCap = Math.round(tokenInfo.price * tokenSupply.uiAmount);
 
     const positionSetting = {
-      buyTip: user.jitoFee,
-      slippage: user.slippage * 100,
+      buyTip: user.jitoFee.buy,
+      slippage: user.slippage.buy * 100,
     }
 
     ctx.session.tokenAddress = tokenAddress;
@@ -96,8 +96,8 @@ const switchToSellPositionAction = async (ctx) => {
     const user  = await User.findOne({ tgId });
 
     const positionSetting = {
-      buyTip: user.jitoFee,
-      slippage: user.slippage * 100,
+      buyTip: user.jitoFee.sell,
+      slippage: user.slippage.sell * 100,
     };
 
     await ctx.editMessageReplyMarkup(sellPositionMarkup(positionSetting).reply_markup);
@@ -116,8 +116,8 @@ const switchToBuyPositionAction = async (ctx) => {
     const user  = await User.findOne({ tgId });
 
     const positionSetting = {
-      buyTip: user.jitoFee,
-      slippage: user.slippage * 100,
+      buyTip: user.jitoFee.buy,
+      slippage: user.slippage.buy * 100,
     };
 
     await ctx.editMessageReplyMarkup(buyPositionMarkup(positionSetting).reply_markup);
@@ -140,8 +140,8 @@ const getPositionAction = async (ctx) => {
   const tgId = ctx.chat.id;
   const user  = await User.findOne({ tgId });
   const positionSetting = {
-    buyTip: user.jitoFee || 0.001,
-    slippage: user.slippage * 100 || 50,
+    buyTip: user.jitoFee.sell,
+    slippage: user.slippage.sell * 100 || 50,
     positionId,
   };
 
@@ -156,7 +156,7 @@ const getPositionAction = async (ctx) => {
  * @param {Context} ctx 
  */
 const buyPosition = async (ctx) => {
-  const purchaseQuantities = [0.0001, 1, 2, 5, 10];
+  const purchaseQuantities = [0.00001, 1, 2, 5, 10];
 
   try {
     const index = parseInt(ctx.match[1]);
@@ -176,14 +176,13 @@ const buyPosition = async (ctx) => {
       return;
     }
 
-    console.log(tokenAddress, amount, user.defaultWallet.privateKey, user.jitoFee);
     
     const result = await swapTokens(
       'So11111111111111111111111111111111111111112',
       tokenAddress,
       amount * 1e9,
       user.defaultWallet.privateKey,
-      user.jitoFee,
+      user.jitoFee.buy,
       tgId,
     );
     
@@ -204,7 +203,7 @@ const buyPosition = async (ctx) => {
         usedSolAmount: amount,
         outAmount: result.outAmount,
         solDiff: result.solDiff,
-        jitoTip: user.jitoFee,
+        jitoTip: user.jitoFee.sell,
         state: true,
       });
       await position.save();

@@ -123,7 +123,10 @@ const settingCommand = async (ctx) => {
       throw new Error('User not found!');
     }
 
-    await ctx.reply(settingText, settingMarkUp(user));
+    await ctx.reply(settingText, {
+      parse_mode: 'HTML',
+      reply_markup: settingMarkUp(user).reply_markup
+    });  
   } catch (error) {
     console.error('Error while settingCommand:', error);
     await ctx.reply('An error occurred while fetching your settings. Please try again later.');
@@ -141,7 +144,7 @@ const setCommands = async () => {
       { command: '/copytrade', description: 'Copy Trade' },
       { command: '/positions', description: 'Positions' },
       { command: '/withdraw', description: 'Withdraw Sol' },
-      { command: '/setting', description: 'Setting' },
+      { command: '/settings', description: 'Setting' },
       { command: '/help', description: 'Help' },
     ];
     const result = await bot.telegram.setMyCommands(commands);

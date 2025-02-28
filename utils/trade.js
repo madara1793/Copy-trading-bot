@@ -1,4 +1,5 @@
-const { PublicKey, Connection } = require('@solana/web3.js');
+const { PublicKey, Connection, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+const { NATIVE_MINT } =  require("@solana/spl-token");
 
 const { bot, connection } = require("@config/config");
 const User = require("@models/user.model");
@@ -23,7 +24,7 @@ const trackTargetWallet = async (trade) => {
 
   console.log(">>>>>Targetting >>>>>>>", targetWalletAddress);
 
-  const subscriptionId = connection.onAccountChange(new PublicKey(targetWalletAddress), async () => {
+  const subscriptionId = connection.onLogs(new PublicKey(targetWalletAddress), async (log) => {
     console.log("Detected>>>>>>", targetWalletAddress);
 
     if (!trade.status) {
@@ -31,11 +32,15 @@ const trackTargetWallet = async (trade) => {
       return;
     }
 
-    const signatures = await connection.getSignaturesForAddress(new PublicKey(targetWalletAddress));
-    let parseRes = await parseTransaction(targetWalletAddress, signatures[0]);
-    if (parseRes === -1) {
-      parseRes = await parseTransaction(targetWalletAddress, signatures[2]);
+    const { logs, err, signature } = log;
+    if (err) {
+      console.log(err);
+      return;
     }
+
+    // const signatures = await connection.getSignaturesForAddress(new PublicKey(targetWalletAddress));
+    let parseRes = await parseTransaction(targetWalletAddress, signature);
+    
     if (!parseRes) {
       return;
     }
@@ -171,9 +176,12 @@ const trackTargetWallet = async (trade) => {
 
           // Distribute
           const usedSolOfPrevPositions = positions.reduce((value, position) => {
-            value += position.usedSolAmount;
+            value += position.solDiff;
+            return value;
           }, 0);
-          const profit = Math.abs(result.outAmount) - Math.abs(usedSolOfPrevPositions)
+
+          console.log(result.solDiff, usedSolOfPrevPositions);
+          const profit = Math.abs(result.solDiff) - usedSolOfPrevPositions
           console.log("profit 2>>>>>>>>", profit);
 
           if (profit > 0) {
@@ -188,7 +196,7 @@ const trackTargetWallet = async (trade) => {
     } else {
       console.log("Parse Error...");
     }
-  });
+  }, "processed");
 
   const curTrade = await Trade.findById(trade._id);
   curTrade.subscriptionId = subscriptionId;
@@ -196,46 +204,53 @@ const trackTargetWallet = async (trade) => {
 }
 
 const parseTransaction = async (copyWalletAddress, signature) => {
-  const transaction = await connection.getTransaction(signature.signature, {
-    maxSupportedTransactionVersion: 0
+  const transaction = await connection.getParsedTransaction(signature, {
+    maxSupportedTransactionVersion: 0,
+    commitment: "confirmed",
   });
 
+  if (!transaction) {
+    return null;
+  }
   const meta = transaction.meta
   if (meta.err) return null;
 
   const postTokenBalances = meta.postTokenBalances;
   const preTokenBalances = meta.preTokenBalances;
-  console.log(postTokenBalances, preTokenBalances)
 
-  if (postTokenBalances.length === 0 || preTokenBalances.length === 0) 
-    return -1;
+  const res =  getDeltaAmount(copyWalletAddress, preTokenBalances, postTokenBalances)
 
-  const targetToken = postTokenBalances.filter(postToken => 
-    preTokenBalances.some(preToken => preToken.mint !== 'So11111111111111111111111111111111111111112' && preToken.accountIndex === postToken.accountIndex)
-  )[0];
+  return res;
+
+  // if (postTokenBalances.length === 0 || preTokenBalances.length === 0) 
+  //   return -1;
+
+  // const targetToken = postTokenBalances.filter(postToken => 
+  //   preTokenBalances.some(preToken => preToken.mint !== 'So11111111111111111111111111111111111111112' && preToken.accountIndex === postToken.accountIndex)
+  // )[0];
 
 
-  const postAmount = postTokenBalances.filter(postToken => postToken.mint === targetToken.mint && postToken.owner === copyWalletAddress)[0] ?
-    postTokenBalances.filter(postToken => postToken.mint === targetToken.mint && postToken.owner === copyWalletAddress)[0].uiTokenAmount.amount 
-    : 0;
-  const preAmount = preTokenBalances.filter(preToken => preToken.mint === targetToken.mint && preToken.owner === copyWalletAddress)[0] ? 
-    preTokenBalances.filter(preToken => preToken.mint === targetToken.mint && preToken.owner === copyWalletAddress)[0].uiTokenAmount.amount 
-    : 0;
+  // const postAmount = postTokenBalances.filter(postToken => postToken.mint === targetToken.mint && postToken.owner === copyWalletAddress)[0] ?
+  //   postTokenBalances.filter(postToken => postToken.mint === targetToken.mint && postToken.owner === copyWalletAddress)[0].uiTokenAmount.amount 
+  //   : 0;
+  // const preAmount = preTokenBalances.filter(preToken => preToken.mint === targetToken.mint && preToken.owner === copyWalletAddress)[0] ? 
+  //   preTokenBalances.filter(preToken => preToken.mint === targetToken.mint && preToken.owner === copyWalletAddress)[0].uiTokenAmount.amount 
+  //   : 0;
 
   
-  let inputMint, outputMint, mode;
+  // let inputMint, outputMint, mode;
 
-  if (postAmount === preAmount) {
-    return null;
-  } else if (postAmount > preAmount) {
-    inputMint = 'So11111111111111111111111111111111111111112';
-    outputMint = targetToken.mint;
-    mode = 'buy';
-  } else {
-    inputMint = targetToken.mint;
-    outputMint = 'So11111111111111111111111111111111111111112';
-    mode = 'sell';
-  }
+  // if (postAmount === preAmount) {
+  //   return null;
+  // } else if (postAmount > preAmount) {
+  //   inputMint = 'So11111111111111111111111111111111111111112';
+  //   outputMint = targetToken.mint;
+  //   mode = 'buy';
+  // } else {
+  //   inputMint = targetToken.mint;
+  //   outputMint = 'So11111111111111111111111111111111111111112';
+  //   mode = 'sell';
+  // }
 
   return {
     inputMint,
@@ -325,9 +340,82 @@ const getDeltaAmount = (signer, preData, postData) => {
   const onlyWsolChanges =
     significantMints.length === 1 &&
     significantMints[0].mint === NATIVE_MINT.toBase58();
-  return onlyWsolChanges ? null : { is_buy, significantMints };
+  
+  if (!significantMints.length) {
+    return null;
+  }
+
+  return onlyWsolChanges ? null : { 
+    mode: is_buy ? 'buy' : 'sell',
+    inputMint: is_buy ? 'So11111111111111111111111111111111111111112' : significantMints[0].mint,
+    outputMint: is_buy ? significantMints[0].mint : 'So11111111111111111111111111111111111111112'
+  };
 };
 
+
+const subscribeTrading = (key, ws) => {
+  console.log("Subscribe to trading events for key:", key);
+  const anaylzeSignature = async (log) => {
+    try {
+      const { logs, err, signature } = log;
+      if (err) return;
+      // Handle new trading events
+      //   console.log("New trading event:", signature);
+      const txn = await connection.getParsedTransaction(signature, {
+        maxSupportedTransactionVersion: 0,
+        commitment: "confirmed",
+      });
+      if (
+        txn &&
+        txn.meta &&
+        txn.meta.preTokenBalances &&
+        txn.meta.postTokenBalances
+      ) {
+        // console.log("predata", txn.meta.preTokenBalances);
+        // console.log("posttokendata", txn.meta.postTokenBalances);
+        // console.log("loaced addresses", txn.meta.innerInstructions);
+        const signer = txn.transaction.message.accountKeys
+          .find(
+            (key) => key.signer && key.writable && key.source === "transaction"
+          )
+          ?.pubkey.toBase58();
+        if (!signer) {
+          console.log("no signer");
+          return;
+        }
+        const solAmount =
+          (txn.meta.postBalances[0] - txn.meta.preBalances[0]) /
+          LAMPORTS_PER_SOL;
+        //   if (Math.abs(solAmount) >= DEFAULT_SOL * 10 ** 9) {
+        const tokenData = getDeltaAmount(
+          signer,
+          txn.meta.preTokenBalances,
+          txn.meta.postTokenBalances
+        );
+        if (!tokenData) return;
+        if (
+          (tokenData.is_buy && solAmount > 0) ||
+          (!tokenData.is_buy && solAmount < 0)
+        )
+          return;
+        if (tokenData.significantMints.length > 0) {
+          ws.send(
+            JSON.stringify({
+              signature,
+              signer,
+              trade: tokenData.is_buy ? "buy" : "sell",
+              solAmount,
+              TokenDelta: tokenData.significantMints,
+            })
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error subscribing to trading events:", error);
+    }
+  };
+  return connection.onLogs(new PublicKey(key), anaylzeSignature, "processed");
+};
 
 // async function sellAllToken(
 //   connection,

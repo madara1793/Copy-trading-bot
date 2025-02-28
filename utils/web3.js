@@ -204,7 +204,7 @@ const swapTokens = async (inputAddr, outputAddr, amount, secretKey, jitoFee, tgI
   );
   const prevSolBalance = await getBalanceOfWallet(keyPair.publicKey.toString());
   
-  const quote = await getQuoteForSwap(inputAddr, outputAddr, parseInt(amount * 0.99));
+  const quote = await getQuoteForSwap(inputAddr, outputAddr, Math.floor(amount * 0.99));
   if (quote.error) {
     return { success: false, error: quote.error };
   }
@@ -230,9 +230,9 @@ const swapTokens = async (inputAddr, outputAddr, amount, secretKey, jitoFee, tgI
   
   const instructions = [
     jitoTipInstruction,
+    feeInstruction,
     ...setupInstructions.map(deserializeInstruction),
     deserializeInstruction(swapInstruction),
-    feeInstruction,
   ];
 
   const addressLookupTableAccounts = [];

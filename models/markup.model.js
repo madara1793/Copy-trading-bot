@@ -42,24 +42,56 @@ const settingMarkUp = (user) => {
   try {
     return Markup.inlineKeyboard([
       [
-        Markup.button.callback(`${user.enableAutoTrade?'🟢':'🔴'} Auto Trading (Auto Buy/Sell)`, "Auto Trading"),
-        Markup.button.callback(`${user.enableAutoTrade?'🔴':'🟢'} Manual Trading`, 'Manual Trading'),
+        Markup.button.callback(`📈 Manual Buy`, 'Manual Buy Setting'),
+        Markup.button.callback(`📉 Manual Sell`, 'Manual Sell Setting'),
       ],
+      // [
+      //   Markup.button.callback(`${user.enableAutoTrade?'🟢':'🔴'} Auto Trading (Auto Buy/Sell)`, "Auto Trading"),
+      //   Markup.button.callback(`${user.enableAutoTrade?'🔴':'🟢'} Manual Trading`, 'Manual Trading'),
+      // ],
       [
-        Markup.button.callback(`💵 Priority Fee`, 'Priority Fee'),
-        Markup.button.callback(`💵 Jito Tip`, 'Jito Tip'),
+        Markup.button.callback('⬅ Return', 'Return'), 
+        Markup.button.callback('❌ Close', 'Close')
       ],
-      [
-        Markup.button.callback(`💵 Trade Amount`, 'Trade Amount'),
-        Markup.button.callback(`💵 Slippage BPS`, 'Slippage BPS'),
-      ],
-      [Markup.button.callback('⬅ Return', 'Return'), Markup.button.callback('❌ Close', 'Close')],
     ]);
   } catch (error) {
     console.error('Error while settingMarkUp:', error);
     throw new Error('Failed to create markup for user settings.');
   }
 };
+
+const ManualBuySettingMarkup = (user) => {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback(`💵 Priority Fee:  ${user.priorityFee.buy} SOL`, 'BUY_PriorityFeeSetting'),
+      Markup.button.callback(`💵 Jito Tip:  ${user.jitoFee.buy} SOL`, 'BUY_JitoTipSetting'),
+    ],
+    [
+      Markup.button.callback(`💵 Trade Amount:  ${user.tradeAmount} SOL`, 'Trade Amount'),
+      Markup.button.callback(`💵 Slippage:  ${user.slippage.buy}%`, 'BUY_SlippageSetting'),
+    ],
+    [
+      Markup.button.callback('⬅ Return', 'Return To Setting'), 
+      Markup.button.callback('❌ Close', 'Close')
+    ],
+  ]);
+};
+
+const ManualSellSettingMarkup = (user) => {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback(`💵 Priority Fee:  ${user.priorityFee.sell} SOL`, 'SELL_PriorityFeeSetting'),
+      Markup.button.callback(`💵 Jito Tip:  ${user.jitoFee.sell} SOL`, 'SELL_JitoTipSetting'),
+    ],
+    [
+      Markup.button.callback(`💵 Slippage:  ${user.slippage.sell*100}%`, 'SELL_SlippageSetting'),
+    ],
+    [
+      Markup.button.callback('⬅ Return', 'Return To Setting'), 
+      Markup.button.callback('❌ Close', 'Close')
+    ],
+  ]);
+}
 
 /**
  * The Markup of Trade Page
@@ -144,5 +176,7 @@ module.exports = {
   walletMarkUp, 
   defaultWalletMarkup,
   settingMarkUp, 
+  ManualBuySettingMarkup,
+  ManualSellSettingMarkup,
   startMarkUp 
 };

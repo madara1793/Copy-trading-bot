@@ -1,6 +1,6 @@
 const { Context } = require("telegraf");
 
-const { settingMarkUp } =  require("@models/markup.model");
+const { settingMarkUp, ManualBuySettingMarkup, ManualSellSettingMarkup } =  require("@models/markup.model");
 const { settingText, followingTraderText } = require("@models/text.model");
 const User = require("@models/user.model");
 const Wallet = require("@models/wallet.model");
@@ -20,12 +20,61 @@ const settingAction = async (ctx) => {
       throw new Error('User not found!');
     }
 
-    await ctx.reply(settingText, settingMarkUp(user));
+    await ctx.reply(settingText, {
+      parse_mode: 'HTML',
+      reply_markup: settingMarkUp(user).reply_markup
+    });
   } catch (error) {
     console.error('Error while settingCommand:', error);
     await ctx.reply('An error occurred while fetching your settings. Please try again later.');
   }
 };
+
+/**
+ * @param {Context} ctx
+ */
+const manualBuySettingAction = async (ctx) => {
+  try {
+    const tgId = ctx.chat.id;
+    const user = await User.findOne({ tgId });
+
+    if (!user) {
+      throw new Error('User not found!');
+    }
+
+    ctx.session.currentSettingScreen = 'BUY';
+    await ctx.editMessageText(settingText, {
+      parse_mode: 'HTML',
+      reply_markup: ManualBuySettingMarkup(user).reply_markup
+    });  
+  } catch (error) {
+    console.error('Error while settingCommand:', error);
+    await ctx.reply('An error occurred while fetching your settings. Please try again later.');
+  }
+}
+
+/**
+ * @param {Context} ctx
+ */
+const manualSellSettingAction = async (ctx) => {
+  try {
+    const tgId = ctx.chat.id;
+    const user = await User.findOne({ tgId });
+
+    if (!user) {
+      throw new Error('User not found!');
+    }
+
+    ctx.session.currentSettingScreen = 'SELL';
+    await ctx.editMessageText(settingText, {
+      parse_mode: 'HTML',
+      reply_markup: ManualSellSettingMarkup(user).reply_markup
+    });    } catch (error) {
+    console.error('Error while settingCommand:', error);
+    await ctx.reply('An error occurred while fetching your settings. Please try again later.');
+  }
+}
+
 
 /**
  * The function to handle 'Wallet' action
@@ -69,27 +118,41 @@ const priorityFeeMsgAction = async (ctx) => {
     throw new Error('User not found!');
   }
 
-  ctx.session.state = 'priorityFee';
-  await ctx.reply(`✍ Input the priority fee you want to set \n Current Fee is ${user.priorityFee}`);
+  if (ctx.update.callback_query.data.split('_')[0] === 'BUY') {
+    ctx.session.state = 'priorityFee_buy';
+  } else {
+    ctx.session.state = 'priorityFee_sell';
+  }
+
+  await ctx.reply(`✍ Input the priority fee you want to set`);
 };
 
 
 /**
  * @param { Context } ctx
  */
-const setPriorityFee = async (ctx) => {
+const setPriorityFee = async (ctx, isBuy) => {
   try {
+    const fee = parseFloat(ctx.message.text);
+    if (isNaN(fee)) {
+      ctx.reply('Invalid Input');
+      return;
+    }
+    
     const tgId = ctx.chat.id;
     const user = await User.findOne({ tgId });
     if (!user) {
       throw new Error('User not found!');
     }
 
-    const priorityFee = ctx.message.text;
-    user.priorityFee = priorityFee;
+    if (isBuy) {
+      user.priorityFee.buy = fee;
+    } else {
+      user.priorityFee.sell = fee;
+    }
     await user.save();
 
-    await ctx.reply(`✅ Priority fee set to ${priorityFee}`);
+    await ctx.reply(`✅ Priority fee updated to ${fee}`);
   } catch (error) {
     console.log("Error while setting priority fee: ", error);
   }
@@ -106,27 +169,39 @@ const jitoTipMsgAction = async (ctx) => {
     throw new Error('User not found!');
   }
 
-  ctx.session.state = 'jitoTip';
-  console.log(user.jitoFee)
-  await ctx.reply(`✍ Input the Jito tip you want to set \n Current Tip is ${user.jitoFee}`);
+  if (ctx.update.callback_query.data.split('_')[0] === 'BUY') {
+    ctx.session.state = 'jitoTip_buy';
+  } else {
+    ctx.session.state = 'jitoTip_sell';
+  }
+  await ctx.reply(`✍ Input the Jito tip you want to set`);
 }
 
 
 /**
  * @param { Context } ctx
  */
-const setJitoTip = async (ctx) => {
+const setJitoTip = async (ctx, isBuy) => {
   const tgId = ctx.chat.id;
+  const tip = parseFloat(ctx.message.text);
+  if (isNaN(tip)) {
+    ctx.reply('Invalid Input');
+    return;
+  }
 
   const user = await User.findOne({ tgId });
   if (!user) {
     throw new Error('User not found!');
   }
 
-  user.jitoFee = ctx.message.text;
+  if (isBuy) {
+    user.jitoFee.buy = tip;
+  } else {
+    user.jitoFee.sell = tip;
+  }
   await user.save();
 
-  await ctx.reply(`✅ Jito tip set to ${user.jitoFee}`);
+  await ctx.reply(`✅ Jito tip updated to ${tip}`);
 }
 
 
@@ -173,29 +248,47 @@ const slippageMsgAction = async (ctx) => {
     throw new Error('User not found!');
   }
 
-  ctx.session.state = 'slippage';
-  await ctx.reply(`✍ Input the slippage you want to set \n Current Slippage is ${user.slippage}`);
+  if (ctx.update.callback_query.data.split('_')[0] === 'BUY') {
+    ctx.session.state = 'slippage_buy';
+  } else {
+    ctx.session.state = 'slippage_sell';
+  }
+  await ctx.reply(`✍ Input the slippage you want to set`);
 }
 
 /**
  * @param { Context } ctx
  */
-const setSlippage = async (ctx) => {
-  const tgId = ctx.chat.id;
+const setSlippage = async (ctx, isBuy) => {
+  const slippage = parseFloat(ctx.message.text);
+  if (isNaN(slippage)) {
+    ctx.reply("Invalid Input");
+    return;
+  }
 
+  const tgId = ctx.chat.id;
   const user = await User.findOne({ tgId });
   if (!user) {
     throw new Error('User not found!');
   }
 
-  user.slippage = ctx.message.text;
+  if (isBuy) {
+    user.slippage.buy = slippage;
+  } else {
+    user.slippage.sell = slippage;
+  }
   await user.save();
 
-  await ctx.reply(`✅ Slippage set to ${user.slippage}`);
+  await ctx.reply(`✅ Slippage updated to ${slippage}`);
 }
+
+
+
 
 module.exports = {
   settingAction,
+  manualBuySettingAction,
+  manualSellSettingAction,
   topTraderAction,
   getFollowingTraders,
   priorityFeeMsgAction,
