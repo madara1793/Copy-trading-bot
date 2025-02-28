@@ -1,4 +1,5 @@
 const { AddressLookupTableAccount, Keypair, PublicKey, VersionedTransaction, SystemProgram, TransactionInstruction, TransactionMessage, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+const { getAssociatedTokenAddress, NATIVE_MINT, createCloseAccountInstruction } = require('@solana/spl-token');
 const { searcherClient } = require("jito-ts/dist/sdk/block-engine/searcher");
 const { Metaplex } = require('@metaplex-foundation/js');
 const bs58 = require('bs58');
@@ -227,12 +228,24 @@ const swapTokens = async (inputAddr, outputAddr, amount, secretKey, jitoFee, tgI
     toPubkey: new PublicKey(process.env.FEE_COLLECTOR),
     lamports: Math.floor(lamports),
   });
+
+  // close wSol ATA 
+  const wSolATA = await getAssociatedTokenAddress(
+    NATIVE_MINT,
+    keyPair.publicKey
+  );
+  const closeATAInstruction = createCloseAccountInstruction(
+    wSolATA,
+    keyPair.publicKey,
+    keyPair.publicKey,
+  );
   
   const instructions = [
     jitoTipInstruction,
     feeInstruction,
     ...setupInstructions.map(deserializeInstruction),
     deserializeInstruction(swapInstruction),
+    closeATAInstruction,
   ];
 
   const addressLookupTableAccounts = [];
