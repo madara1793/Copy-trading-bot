@@ -34,20 +34,38 @@ const UserSchema = new Schema({
     default: 0,
   },
   priorityFee: {
-    type: Number,
-    default: 0.00000001,
+    buy: {
+      type: Number,
+      default: 0.0001,
+    },
+    sell: {
+      type: Number,
+      default: 0.0001,
+    }
   },
   jitoFee: {
-    type: Number,
-    default: 0.001,
+    buy: {
+      type: Number,
+      default: 0.001,
+    },
+    sell: {
+      type: Number,
+      default: 0.001,
+    }
   },
   tradeAmount: {
     type: Number,
     default: 0.001,
   },
   slippage: {
-    type: Number,
-    default: 0.01,
+    buy: {
+      type: Number,
+      default: 0.02,
+    },
+    sell: {
+      type: Number,
+      default: 0.02,
+    }
   },
   enableAutoTrade: {
     type: Boolean,

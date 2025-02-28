@@ -11,7 +11,7 @@ const fetch = require("cross-fetch");
 const getQuoteForSwap = async (inputAddr, outputAddr, amount, slippageBps = 50) => {
   try {
     const response = await fetch(
-      `https://quote-api.jup.ag/v6/quote?inputMint=${inputAddr}&outputMint=${outputAddr}&amount=${amount}&slippageBps=${slippageBps}&platformFeeBps=100`
+      `https://quote-api.jup.ag/v6/quote?inputMint=${inputAddr}&outputMint=${outputAddr}&amount=${amount}&slippageBps=${slippageBps}`
     );
     const quote = await response.json();
     

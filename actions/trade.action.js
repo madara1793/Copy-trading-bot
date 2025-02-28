@@ -252,7 +252,7 @@ const changeTradeWallet = async (ctx) => {
       trade.wallet = user.wallets[index];
       await trade.save();
 
-      const updatedTrade = await Trade.findById(trade._id).populate('wallet', 'name');
+      const updatedTrade = await Trade.findById(trade._id).populate('wallet').populate('userId');
       await ctx.reply(
         tradeMainText(updatedTrade), 
         {
@@ -260,6 +260,9 @@ const changeTradeWallet = async (ctx) => {
           reply_markup: tradeSettingMarkup(updatedTrade).reply_markup
         }
       );
+
+      connection.removeOnLogsListener(updatedTrade.subscriptionId);
+      trackTargetWallet(updatedTrade);
     } else {
       await ctx.reply("Invalid wallet");
     }
@@ -383,7 +386,8 @@ const setTargetAddress = async (tradeId, targetAddress) => {
     }
 
     if (trade.subscriptionId) {
-      connection.removeAccountChangeListener(trade.subscriptionId)
+      console.log(trade.subscriptionId)
+      connection.removeOnLogsListener(trade.subscriptionId)
     }
     
     console.log({
@@ -670,12 +674,18 @@ const setCopyPriorityFee = async (tradeId, fee) => {
 const updateTradeState = async (ctx) => {
   try {
     const tradeId = ctx.session.tradeId;
-    const trade = await Trade.findById(tradeId).populate('wallet', 'name');
+    const trade = await Trade.findById(tradeId).populate('wallet').populate('userId');
     if (!trade) {
       throw new Error('Trade not found!');
     }
     trade.status = !trade.status;
     await trade.save();
+
+    if (!trade.status) {
+      await connection.removeOnLogsListener(trade.subscriptionId);
+    } else {
+      trackTargetWallet(trade);
+    }
 
     await ctx.editMessageText(
       tradeMainText(trade),
@@ -700,7 +710,10 @@ const deleteTrade = async (ctx) => {
   try {
     const tradeId = ctx.session.tradeId;
     
-    await Trade.findByIdAndDelete(tradeId);
+    const trade = await Trade.findById(tradeId);
+    await connection.removeOnLogsListener(trade.subscriptionId);
+
+    await Trade.deleteOne({ _id: tradeId });
 
     await ctx.deleteMessage();
     tradeAction(ctx);
@@ -717,7 +730,7 @@ const deleteTrade = async (ctx) => {
  */
 const setupTradeAction = async (ctx, tradeId) => {
   try {
-    const trade = await Trade.findById(tradeId).populate('wallet', 'name');
+    const trade = await Trade.findById(tradeId).populate('wallet', 'userId');
     if (!trade) {
       throw new Error('Trade not found!');
     }
@@ -729,6 +742,9 @@ const setupTradeAction = async (ctx, tradeId) => {
         reply_markup: tradeSettingMarkup(trade).reply_markup
       }
     );
+
+    connection.removeOnLogsListener(trade.subscriptionId);
+    trackTargetWallet(trade);
   } catch (error) {
     console.log("Error while setTradeName:", error);
     return false;
