@@ -25,10 +25,6 @@ mongoose
     console.error("DB Connection Error: ", error);
   });
   
-
-
-
-
 /*************************  Bot Setup  *************************/
 
 const bot = new Telegraf(BOT_TOKEN);
